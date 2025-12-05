@@ -1,0 +1,45 @@
+# ESP32 Emulator Configuration
+
+# Network Settings
+fog_server:
+  host: "localhost"  # IP fog-сервера (пока localhost, потом поменяем если нужно)
+  port: 8001
+  endpoint: "/api/v1/telemetry"  # Куда отправлять данные
+
+# Device Settings
+device:
+  id: "esp32_master_001"  # Уникальный идентификатор этого ESP32
+  gpu_count: 8  # Количество видеокарт
+
+# Timing Settings (в секундах)
+timing:
+  sensor_read_interval: 5   # Как часто читаем датчики (5 сек)
+  data_send_interval: 30    # Как часто отправляем данные (30 сек)
+  
+# Temperature Simulation Parameters
+simulation:
+  room_temp:
+    base: 24.0              # Базовая температура помещения (°C)
+    variation: 2.0          # Вариация (комната медленно нагревается)
+    
+  gpu_temp:
+    idle_min: 35.0          # Минимальная температура GPU в простое
+    idle_max: 45.0          # Максимальная температура GPU в простое
+    load_min: 60.0          # Температура под нагрузкой (минимум)
+    load_max: 85.0          # Температура под нагрузкой (максимум)
+    heating_rate: 2.0       # Скорость нагрева (°C/сек)
+    cooling_rate: 1.5       # Скорость охлаждения (°C/сек)
+    
+  sensor_noise: 0.3         # Шум датчика DS18B20 (±0.3°C)
+
+# Fan Simulation
+fans:
+  rpm_min: 800              # Минимальные обороты (вентилятор не выключается)
+  rpm_max: 5000             # Максимальные обороты
+  pwm_to_rpm_factor: 40     # Коэффициент: RPM = PWM * factor
+  
+# Workload Simulation (случайная нагрузка на GPU)
+workload:
+  enabled: true             # Включить симуляцию нагрузки
+  change_probability: 0.3   # Вероятность изменения нагрузки (10% каждый цикл)
+  high_load_probability: 0.8  # Вероятность высокой нагрузки
