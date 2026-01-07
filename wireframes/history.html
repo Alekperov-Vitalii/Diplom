@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireframe - History</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header -->
+        <div style="margin-bottom: 20px;">
+            <a href="index.html" style="text-decoration: none; color: black;">← Назад до головної</a>
+            <h1>Історія та аналітика</h1>
+        </div>
+
+        <!-- Period Selector -->
+        <div class="card">
+            <label>Період часу:</label>
+            <div style="display: inline-block; margin-left: 10px;">
+                <button class="btn" style="background: #ccc;">1 год</button>
+                <button class="btn">3 год</button>
+                <button class="btn">6 год</button>
+                <button class="btn">24 год</button>
+            </div>
+        </div>
+
+        <!-- GPU Chart -->
+        <h2>Температури GPU</h2>
+        <div class="card">
+            <div class="chart-placeholder">
+                <div class="chart-line"></div>
+                <span style="position: absolute; left: 10px; top: 10px;">Температура (°C)</span>
+                <!-- Abstract lines representing data -->
+                <svg width="100%" height="100%" style="position: absolute; top:0; left:0;">
+                    <path d="M 50 250 Q 200 100 400 200 T 800 150" fill="none" stroke="black" stroke-width="2"/>
+                    <path d="M 50 260 Q 200 120 400 210 T 800 160" fill="none" stroke="#666" stroke-width="2"/>
+                    <path d="M 50 240 Q 200 150 400 180 T 800 140" fill="none" stroke="#999" stroke-width="2"/>
+                </svg>
+            </div>
+            <div style="margin-top: 10px; text-align: center;">
+                <span style="margin-right: 15px;">— GPU 1</span>
+                <span style="margin-right: 15px; color: #666;">— GPU 2</span>
+                <span style="color: #999;">— GPU 3</span>
+            </div>
+        </div>
+
+        <!-- Fan Chart -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 30px;">
+            <h2>Продуктивність вентиляторів</h2>
+            <div>
+                <button class="btn" style="background: #ccc;">PWM (%)</button>
+                <button class="btn">Оберти (RPM)</button>
+            </div>
+        </div>
+        
+        <div class="card">
+            <div class="chart-placeholder">
+                <div class="chart-line"></div>
+                <!-- Abstract step lines for PWM -->
+                <svg width="100%" height="100%" style="position: absolute; top:0; left:0;">
+                    <polyline points="50,250 200,250 200,150 400,150 400,100 800,100" fill="none" stroke="black" stroke-width="2"/>
+                </svg>
+            </div>
+        </div>
+
+        <!-- Explanation -->
+        <div class="card" style="border-left: 5px solid #000; background-color: #f9f9f9;">
+            <h3>Як читати ці графіки</h3>
+            <p><strong>Температура:</strong> показує тенденції нагріву обладнання під навантаженням протягом часу.</p>
+            <p><strong>PWM/Оберти:</strong> показує реакцію системи охолодження. Має спостерігатися кореляція: ріст температури → збільшення обертів.</p>
+        </div>
+    </div>
+</body>
+</html>

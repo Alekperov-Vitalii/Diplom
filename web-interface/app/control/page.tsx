@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { ArrowLeft, AlertTriangle, Power, Save, RotateCcw } from 'lucide-react';
+import { ArrowLeft, AlertTriangle, Save, RotateCcw } from 'lucide-react';
 import { 
   getSystemMode, 
   setSystemMode, 
@@ -34,7 +34,7 @@ export default function Control() {
         setMode(modeData);
         setState(stateData);
         setActions(actionsData);
-        // fanPWM НЕ сбрасываем!
+        // fanPWM НЕ скидаємо!
       } catch (error) {
         console.error('Error fetching data:', error);
       } finally {
@@ -47,7 +47,7 @@ export default function Control() {
     return () => clearInterval(interval);
   }, []);
 
-  // Инициализация PWM только при первом рендере
+  // Ініціалізація PWM тільки при першому рендері
   useEffect(() => {
     if (Object.keys(fanPWM).length === 0) {
       const initialPWM: { [key: number]: number } = {};
@@ -56,7 +56,7 @@ export default function Control() {
       }
       setFanPWM(initialPWM);
     }
-  }, []);
+  }, [fanPWM]);
 
   const handleModeSwitch = async (newMode: 'auto' | 'manual') => {
     try {
@@ -64,35 +64,35 @@ export default function Control() {
       setMode({ ...mode!, mode: newMode });
       
       if (newMode === 'auto') {
-        alert('✓ Система переключена на автоматический режим');
+        alert('✓ Систему переключено на автоматичний режим');
       }
     } catch (error) {
-      alert('Ошибка переключения режима: ' + error);
+      alert('Помилка перемикання режиму: ' + error);
     }
   };
 
   const handleApplyManualControl = async () => {
     if (mode?.mode !== 'manual') {
-      alert('Сначала переключитесь на ручной режим!');
+      alert('Спочатку переключіться на ручний режим!');
       return;
     }
 
-    // Проверка: предупреждение о горячих GPU
+    // Перевірка: попередження про гарячі GPU
     const warnings = [];
     for (let i = 1; i <= 8; i++) {
       const gpuTemp = state?.gpu_temps.find(g => g.gpu_id === i)?.temperature || 0;
       const pwm = fanPWM[i];
       
       if (gpuTemp > 70 && pwm < 60) {
-        warnings.push(`GPU ${i}: ${gpuTemp.toFixed(1)}°C, но PWM только ${pwm}%`);
+        warnings.push(`GPU ${i}: ${gpuTemp.toFixed(1)}°C, але PWM лише ${pwm}%`);
       }
     }
 
     if (warnings.length > 0) {
       const confirmed = confirm(
-        '⚠️ ПРЕДУПРЕЖДЕНИЕ:\n\n' +
+        '⚠️ ПОПЕРЕДЖЕННЯ:\n\n' +
         warnings.join('\n') +
-        '\n\nГПУ могут перегреться. Продолжить?'
+        '\n\nГПУ можуть перегрітися. Продовжити?'
       );
       if (!confirmed) return;
     }
@@ -105,14 +105,14 @@ export default function Control() {
       }));
 
       await setManualFanControl(commands);
-      alert('✓ Ручные команды применены успешно!');
+      alert('✓ Ручні команди застосовано успішно!');
       
-      // Обновляем историю действий
+      // Оновлюємо історію дій
       const newActions = await getUserActions(10);
       setActions(newActions);
     } catch (error: unknown) {
       const message = error instanceof Error ? error.message : String(error);
-      alert('Ошибка: ' + message);
+      alert('Помилка: ' + message);
     } finally {
       setSaving(false);
     }
@@ -132,21 +132,21 @@ export default function Control() {
     setFanPWM(newPWM);
   };
 
-  if (loading) return <div className="p-8">Загрузка...</div>;
+  if (loading) return <div className="p-8">Завантаження...</div>;
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 text-gray-900 p-8">
       <div className="max-w-6xl mx-auto">
         <Link href="/" className="flex items-center text-blue-500 hover:text-blue-600 mb-4">
           <ArrowLeft className="w-4 h-4 mr-1" />
-          Назад к Dashboard
+          Назад до Dashboard
         </Link>
         
-        <h1 className="text-3xl font-bold mb-6">🎛️ Ручное управление вентиляторами</h1>
+        <h1 className="text-3xl font-bold mb-6">🎛️ Ручне керування вентиляторами</h1>
         
-        {/* Переключатель режима */}
+        {/* Перемикач режиму */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-xl font-bold mb-4">Режим работы системы</h2>
+          <h2 className="text-xl font-bold mb-4">Режим роботи системи</h2>
           
           <div className="flex space-x-4 mb-4">
             <button
@@ -157,7 +157,7 @@ export default function Control() {
                   : 'bg-gray-200 hover:bg-gray-300'
               }`}
             >
-              🤖 Автоматический (рекомендуется)
+              🤖 Автоматичний (рекомендовано)
             </button>
             
             <button
@@ -168,14 +168,14 @@ export default function Control() {
                   : 'bg-gray-200 hover:bg-gray-300'
               }`}
             >
-              🎛️ Ручной
+              🎛️ Ручний
             </button>
           </div>
           
           {mode?.mode === 'auto' && (
             <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
               <p className="text-sm text-blue-700">
-                ✓ Система работает в автоматическом режиме. Каскадный алгоритм управляет вентиляторами на основе температуры GPU и помещения.
+                ✓ Система працює в автоматичному режимі. Каскадний алгоритм керує вентиляторами на основі температури GPU та приміщення.
               </p>
             </div>
           )}
@@ -185,20 +185,20 @@ export default function Control() {
               <div className="flex items-start">
                 <AlertTriangle className="w-5 h-5 text-yellow-600 mr-2 flex-shrink-0 mt-0.5" />
                 <div className="text-sm text-yellow-700">
-                  <p className="font-medium mb-1">Ручной режим активен</p>
-                  <p>Вы полностью контролируете вентиляторы. Следите за температурами GPU чтобы избежать перегрева.</p>
+                  <p className="font-medium mb-1">Ручний режим активний</p>
+                  <p>Ви повністю контролюєте вентилятори. Слідкуйте за температурами GPU, щоб уникнути перегріву.</p>
                 </div>
               </div>
             </div>
           )}
         </div>
 
-        {/* Ручное управление */}
+        {/* Ручне керування */}
         {mode?.mode === 'manual' && (
           <>
-            {/* Профили */}
+            {/* Профілі */}
             <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-xl font-bold mb-4">Предустановленные профили</h2>
+              <h2 className="text-xl font-bold mb-4">Попередньо встановлені профілі</h2>
               
               <div className="grid grid-cols-3 gap-4">
                 <button
@@ -207,7 +207,7 @@ export default function Control() {
                 >
                   <div className="text-2xl mb-2">🔇</div>
                   <div className="font-medium">Тихий режим</div>
-                  <div className="text-sm text-gray-600">25% PWM</div>
+                  <div className="text-sm text-gray-800">25% PWM</div>
                 </button>
                 
                 <button
@@ -215,8 +215,8 @@ export default function Control() {
                   className="p-4 border-2 border-gray-300 rounded-lg hover:border-blue-500 transition"
                 >
                   <div className="text-2xl mb-2">⚖️</div>
-                  <div className="font-medium">Сбалансированный</div>
-                  <div className="text-sm text-gray-600">50% PWM</div>
+                  <div className="font-medium">Збалансований</div>
+                  <div className="text-sm text-gray-800">50% PWM</div>
                 </button>
                 
                 <button
@@ -225,14 +225,14 @@ export default function Control() {
                 >
                   <div className="text-2xl mb-2">🔥</div>
                   <div className="font-medium">Максимум</div>
-                  <div className="text-sm text-gray-600">100% PWM</div>
+                  <div className="text-sm text-gray-800">100% PWM</div>
                 </button>
               </div>
             </div>
 
-            {/* Слайдеры */}
+            {/* Слайдери */}
             <div className="bg-white rounded-lg shadow p-6 mb-6">
-              <h2 className="text-xl font-bold mb-4">Настройка вентиляторов</h2>
+              <h2 className="text-xl font-bold mb-4">Налаштування вентиляторів</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 {[1, 2, 3, 4, 5, 6, 7, 8].map(fanId => {
@@ -245,14 +245,14 @@ export default function Control() {
                     <div key={fanId} className="border rounded-lg p-4">
                       <div className="flex justify-between items-center mb-2">
                         <span className="font-medium">Вентилятор {fanId}</span>
-                        <span className="text-sm text-gray-600">
+                        <span className="text-sm text-gray-800">
                           GPU: {gpuTemp.toFixed(1)}°C
                         </span>
                       </div>
                       
                       {isWarning && (
                         <div className="bg-yellow-50 text-yellow-700 text-xs p-2 rounded mb-2">
-                          ⚠️ GPU горячий, рекомендуется &gt;60% PWM
+                          ⚠️ GPU гарячий, рекомендовано &gt;60% PWM
                         </div>
                       )}
                       
@@ -266,8 +266,8 @@ export default function Control() {
                       />
                       
                       <div className="flex justify-between text-sm mt-2">
-                        <span className="text-gray-600">PWM: {pwm}%</span>
-                        <span className="text-gray-600">{rpm} RPM</span>
+                        <span className="text-gray-800">PWM: {pwm}%</span>
+                        <span className="text-gray-800">{rpm} RPM</span>
                       </div>
                     </div>
                   );
@@ -281,7 +281,7 @@ export default function Control() {
                   className="flex-1 bg-purple-500 text-white py-3 px-6 rounded-lg hover:bg-purple-600 transition disabled:opacity-50 flex items-center justify-center space-x-2"
                 >
                   <Save className="w-5 h-5" />
-                  <span>{saving ? 'Применение...' : 'Применить изменения'}</span>
+                  <span>{saving ? 'Застосування...' : 'Застосувати зміни'}</span>
                 </button>
                 
                 <button
@@ -289,26 +289,26 @@ export default function Control() {
                   className="bg-gray-300 text-gray-700 py-3 px-6 rounded-lg hover:bg-gray-400 transition flex items-center space-x-2"
                 >
                   <RotateCcw className="w-5 h-5" />
-                  <span>Сбросить</span>
+                  <span>Скинути</span>
                 </button>
               </div>
             </div>
           </>
         )}
 
-        {/* История действий */}
+        {/* Історія дій */}
         {actions.length > 0 && (
           <div className="bg-white rounded-lg shadow p-6">
-            <h2 className="text-xl font-bold mb-4">📜 История действий пользователя</h2>
+            <h2 className="text-xl font-bold mb-4">📜 Історія дій користувача</h2>
             
             <div className="space-y-2">
               {actions.map((action, idx) => (
                 <div key={idx} className="flex items-start space-x-3 text-sm border-b pb-2">
-                  <span className="text-gray-500">
-                    {new Date(action.timestamp).toLocaleTimeString('ru-RU')}
+                  <span className="text-gray-700">
+                    {new Date(action.timestamp).toLocaleTimeString('uk-UA')}
                   </span>
                   <span className="font-medium">{action.action}</span>
-                  <span className="text-gray-600 flex-1">
+                  <span className="text-gray-800 flex-1">
                     {JSON.stringify(action.details)}
                   </span>
                 </div>
@@ -317,18 +317,20 @@ export default function Control() {
           </div>
         )}
 
-        {/* Аргументация */}
+        {/* Аргументация 
         <div className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg mt-6">
-          <h3 className="font-bold text-lg mb-2">💡 Зачем нужен ручной режим?</h3>
-          <ul className="space-y-2 text-sm text-gray-700">
-            <li><strong>• Тестирование:</strong> Проверка работоспособности каждого вентилятора</li>
-            <li><strong>• Экстренные ситуации:</strong> Вмешательство при сбоях алгоритма</li>
-            <li><strong>• Специальные режимы:</strong> Ночной режим (тишина), стресс-тесты</li>
-            <li><strong>• Экономия энергии:</strong> Снижение оборотов в простое ниже автоматического минимума</li>
-            <li><strong>• Износ оборудования:</strong> Перераспределение нагрузки между вентиляторами</li>
-            <li><strong>• Демонстрация:</strong> Сравнение эффективности ручного vs автоматического режима</li>
+          <h3 className="font-bold text-lg mb-2">💡 Навіщо потрібен ручний режим?</h3>
+          <ul className="space-y-2 text-sm text-gray-900">
+            <li><strong>• Тестування:</strong> Перевірка працездатності кожного вентилятора</li>
+            <li><strong>• Екстрені ситуації:</strong> Втручання при збоях алгоритму</li>
+            <li><strong>• Спеціальні режими:</strong> Нічний режим (тиша), стрес-тести</li>
+            <li><strong>• Економія енергії:</strong> Зниження обертів у простої нижче автоматичного мінімуму</li>
+            <li><strong>• Знос обладнання:</strong> Перерозподіл навантаження між вентиляторами</li>
+            <li><strong>• Демонстрація:</strong> Порівняння ефективності ручного vs автоматичного режиму</li>
           </ul>
         </div>
+        */}
+        
       </div>
     </div>
   );

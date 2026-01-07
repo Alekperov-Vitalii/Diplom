@@ -119,7 +119,7 @@ class ESP32Emulator:
         
         self.total_readings += 1
         
-        # Логируем каждое 6-е чтение (раз в 30 секунд)
+        # Логируем каждое 6-е чтение 
         if self.total_readings % 6 == 0:
             self._log_current_state()
     

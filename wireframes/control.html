@@ -1,0 +1,135 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireframe - Manual Control</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="container">
+        <!-- Header / Navigation -->
+        <div style="margin-bottom: 20px;">
+            <a href="index.html" style="text-decoration: none; color: black;">← Наза до головної</a>
+            <h1>Ручне керування вентиляторами</h1>
+        </div>
+
+        <!-- Profiles (First Block) -->
+        <h2>Вибір швидкого профілю</h2>
+        <div class="grid-4" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="card" style="text-align: center; cursor: pointer;">
+                <div style="font-size: 24px;">1</div>
+                <h3>Швидкий профіль 1</h3>
+                <p>Опис параметрів профілю</p>
+            </div>
+            <div class="card" style="text-align: center; cursor: pointer; border: 2px solid black;">
+                <div style="font-size: 24px;">2</div>
+                <h3>Швидкий профіль 2</h3>
+                <p>Опис параметрів профілю</p>
+            </div>
+            <div class="card" style="text-align: center; cursor: pointer;">
+                <div style="font-size: 24px;">3</div>
+                <h3>Швидкий профіль 3</h3>
+                <p>Опис параметрів профілю</p>
+            </div>
+        </div>
+
+        <!-- Mode Switch (Moved below or integrated) -->
+        <div class="card" style="text-align: center; padding: 20px; margin-top: 20px;">
+            <strong>Режим системи:</strong> [ Автоматичний / Ручний ]
+        </div>
+
+        <!-- Sliders -->
+        <h2>Налаштування вентиляторів</h2>
+        <div class="card">
+            <div class="grid-2">
+                <!-- Fan 1 -->
+                <div class="slider-container">
+                    <div style="display: flex; justify-content: space-between;">
+                        <strong>Вентилятор 1</strong>
+                        <span>Температура GPU °C</span>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <input type="range" style="width: 100%;" value="50">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                        <span>Відсоток потужності</span>
+                        <span>Оберти за хвилину</span>
+                    </div>
+                </div>
+
+                <!-- Fan 2 -->
+                <div class="slider-container">
+                    <div style="display: flex; justify-content: space-between;">
+                        <strong>Вентилятор 2</strong>
+                        <span>Температура GPU °C</span>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <input type="range" style="width: 100%;" value="50">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                        <span>Відсоток потужності</span>
+                        <span>Оберти за хвилину</span>
+                    </div>
+                </div>
+
+                <!-- Fan 3 -->
+                <div class="slider-container">
+                    <div style="display: flex; justify-content: space-between;">
+                        <strong>Вентилятор 3</strong>
+                        <span>Температура GPU °C</span>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <input type="range" style="width: 100%;" value="50">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                        <span>Відсоток потужності</span>
+                        <span>Оберти за хвилину</span>
+                    </div>
+                </div>
+
+                <!-- Fan 4 -->
+                <div class="slider-container">
+                    <div style="display: flex; justify-content: space-between;">
+                        <strong>Вентилятор 4</strong>
+                        <span>Температура GPU °C</span>
+                    </div>
+                    <div style="margin: 15px 0;">
+                        <input type="range" style="width: 100%;" value="50">
+                    </div>
+                    <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                        <span>Відсоток потужності</span>
+                        <span>Оберти за хвилину</span>
+                    </div>
+                </div>
+            </div>
+            
+            <div style="text-align: center; margin-top: 10px; color: #666;">... Вентилятори 5-8 ...</div>
+
+            <div style="margin-top: 20px; display: flex; gap: 20px;">
+                <button class="btn" style="flex: 2; background-color: #000; color: white;">Застосувати зміни</button>
+                <button class="btn" style="flex: 1;">Скинути налаштування</button>
+            </div>
+        </div>
+
+        <!-- History Log -->
+        <div class="card">
+            <h3>Історія дій користувача</h3>
+            <ul style="list-style: none; padding: 0;">
+                <li style="border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between;">
+                    <div style="flex: 1;"><strong>Час внесення змін</strong></div>
+                    <div style="flex: 2;"><strong>Дія користувача</strong></div>
+                </li>
+                <li style="border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between;">
+                    <div style="flex: 1;">Час</div>
+                    <div style="flex: 2;">Опис дії користувача</div>
+                </li>
+                <li style="border-bottom: 1px solid #eee; padding: 10px 0; display: flex; justify-content: space-between;">
+                    <div style="flex: 1;">Час</div>
+                    <div style="flex: 2;">Опис дії користувача</div>
+                </li>
+            </ul>
+        </div>
+    </div>
+</body>
+</html>

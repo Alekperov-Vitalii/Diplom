@@ -1,0 +1,161 @@
+<!DOCTYPE html>
+<html lang="uk">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Wireframe - Dashboard</title>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        /* Force equal height for cards in grid */
+        .grid-4 .card {
+            height: 100%;
+            box-sizing: border-box;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <!-- Status Bar -->
+        <section class="status-bar" style="margin-top: 0;">
+            <div>
+                <span class="icon-placeholder"></span>
+                <strong>Статус системи</strong>
+            </div>
+            <div>
+                <span class="icon-placeholder"></span>
+                <span style="border: 1px solid #333; padding: 2px 8px; border-radius: 10px;">Режим керування охолодженням</span>
+            </div>
+            <div style="margin-left: auto;">
+                Час останнього оновлення системи
+            </div>
+        </section>
+
+        <!-- Alerts -->
+        <div class="card status-crit" style="background-color: #eee;">
+            <span class="icon-placeholder"></span>
+            <strong>Повідомлення про критичну температуру GPU</strong>
+        </div>
+
+        <!-- GPU Temperatures -->
+        <h2>Температури GPU</h2>
+        <div class="grid-4">
+            <!-- GPU Cards - Generic -->
+            <div class="card status-good">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва GPU</h3>
+                    <span class="icon-placeholder"></span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">Значення температури °C</div>
+                <div style="font-size: 12px;">Статус керування</div>
+            </div>
+            <!-- Repeat uniform cards -->
+            <div class="card status-good">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва GPU</h3>
+                    <span class="icon-placeholder"></span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">Значення температури °C</div>
+                <div style="font-size: 12px;">Статус керування</div>
+            </div>
+            <div class="card status-good">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва GPU</h3>
+                    <span class="icon-placeholder"></span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">Значення температури °C</div>
+                <div style="font-size: 12px;">Статус керування</div>
+            </div>
+            <div class="card status-good">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва GPU</h3>
+                    <span class="icon-placeholder"></span>
+                </div>
+                <div style="font-size: 24px; font-weight: bold; margin: 10px 0;">Значення температури °C</div>
+                <div style="font-size: 12px;">Статус керування</div>
+            </div>
+        </div>
+
+        <!-- Fans -->
+        <h2>Вентилятори</h2>
+        <div class="grid-4">
+            <!-- Fan Cards - Detailed & Uniform -->
+            <div class="card">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва вентилятора</h3>
+                    <small>Режим</small>
+                </div>
+                <div style="margin: 10px 0;">
+                    <small>Відсоток потужності вентилятора</small>
+                    <div style="width: 100%; height: 8px; background: #eee; border: 1px solid #333; margin-top: 5px;">
+                        <div style="width: 50%; height: 100%; background: #666;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>Оберти за хвилину</span>
+                    <span>Статус навантаження</span>
+                </div>
+            </div>
+            
+            <div class="card">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва вентилятора</h3>
+                    <small>Режим</small>
+                </div>
+                <div style="margin: 10px 0;">
+                    <small>Відсоток потужності вентилятора</small>
+                    <div style="width: 100%; height: 8px; background: #eee; border: 1px solid #333; margin-top: 5px;">
+                        <div style="width: 50%; height: 100%; background: #666;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>Оберти за хвилину</span>
+                    <span>Статус навантаження</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва вентилятора</h3>
+                    <small>Режим</small>
+                </div>
+                <div style="margin: 10px 0;">
+                    <small>Відсоток потужності вентилятора</small>
+                    <div style="width: 100%; height: 8px; background: #eee; border: 1px solid #333; margin-top: 5px;">
+                        <div style="width: 50%; height: 100%; background: #666;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>Оберти за хвилину</span>
+                    <span>Статус навантаження</span>
+                </div>
+            </div>
+
+            <div class="card">
+                <div style="display:flex; justify-content:space-between;">
+                    <h3>Назва вентилятора</h3>
+                    <small>Режим</small>
+                </div>
+                <div style="margin: 10px 0;">
+                    <small>Відсоток потужності вентилятора</small>
+                    <div style="width: 100%; height: 8px; background: #eee; border: 1px solid #333; margin-top: 5px;">
+                        <div style="width: 50%; height: 100%; background: #666;"></div>
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: space-between; font-size: 12px;">
+                    <span>Оберти за хвилину</span>
+                    <span>Статус навантаження</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- Navigation -->
+        <div style="margin-top: 30px; display: flex; gap: 20px;">
+            <a href="history.html" class="btn" style="flex: 1; padding: 20px;">Переглянути історію та графіки</a>
+            <a href="control.html" class="btn" style="flex: 1; padding: 20px;">Ручне керування</a>
+        </div>
+    </div>
+</body>
+</html>

@@ -46,7 +46,7 @@ export default function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-screen">
-        <div className="text-xl">Загрузка...</div>
+        <div className="text-xl">Завантаження...</div>
       </div>
     );
   }
@@ -56,8 +56,8 @@ export default function Dashboard() {
       <div className="flex items-center justify-center min-h-screen">
         <div className="text-center">
           <AlertTriangle className="w-16 h-16 text-red-500 mx-auto mb-4" />
-          <h1 className="text-2xl font-bold mb-2">Сервер недоступен</h1>
-          <p className="text-gray-600">Убедитесь что fog-сервер запущен на порту 8000</p>
+          <h1 className="text-2xl font-bold mb-2">Сервер недоступний</h1>
+          <p className="text-gray-800">Переконайтеся, що fog-сервер запущено на порту 8001</p>
         </div>
       </div>
     );
@@ -67,12 +67,12 @@ export default function Dashboard() {
   const warningAlerts = state?.alerts.filter(a => a.severity === 'warning') || [];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 text-gray-900 p-8">
       <div className="max-w-7xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <h1 className="text-4xl font-bold mb-2">GPU Cooling System</h1>
-          <p className="text-gray-600">Мониторинг и управление охлаждением GPU-кластера</p>
+          <h1 className="text-4xl font-bold mb-2">Дипломка - Версия 3.3 - 01.12.25</h1> {/* GPU Cooling System */ }
+          <p className="text-gray-800">Дипломка моніторинг та керування охолодженням GPU-кластера </p>{/* Моніторинг та керування охолодженням GPU-кластера */ }
         </div>
 
         {/* Status Bar */}
@@ -80,28 +80,28 @@ export default function Dashboard() {
           <div className="flex items-center space-x-4">
             <div className="flex items-center space-x-2">
               <Activity className="w-5 h-5 text-green-500" />
-              <span className="font-medium">Система работает</span>
+              <span className="font-medium">Система працює</span>
             </div>
             
             <div className="flex items-center space-x-2">
               {systemMode?.mode === 'auto' ? (
                 <>
                   <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
-                    🤖 Автоматический режим
+                    🤖 Автоматичний режим
                   </span>
                 </>
               ) : (
                 <>
                   <span className="px-3 py-1 bg-purple-100 text-purple-700 rounded-full text-sm font-medium">
-                    🎛️ Ручной режим
+                    🎛️ Ручний режим
                   </span>
                 </>
               )}
             </div>
           </div>
           
-          <div className="text-sm text-gray-500">
-            Обновлено: {state ? new Date(state.timestamp).toLocaleTimeString('ru-RU') : '—'}
+          <div className="text-sm text-gray-700">
+            Оновлено: {state ? new Date(state.timestamp).toLocaleTimeString('uk-UA') : '—'}
           </div>
         </div>
 
@@ -113,7 +113,7 @@ export default function Dashboard() {
                 <div className="flex items-center">
                   <AlertTriangle className="w-5 h-5 text-red-500 mr-2" />
                   <span className="font-bold text-red-700">
-                    КРИТИЧНО: GPU {alert.gpu_id} — {alert.temperature.toFixed(1)}°C (порог {alert.threshold}°C)
+                    КРИТИЧНО: GPU {alert.gpu_id} — {alert.temperature.toFixed(1)}°C (поріг {alert.threshold}°C)
                   </span>
                 </div>
               </div>
@@ -123,7 +123,7 @@ export default function Dashboard() {
                 <div className="flex items-center">
                   <AlertTriangle className="w-5 h-5 text-yellow-500 mr-2" />
                   <span className="font-medium text-yellow-700">
-                    Предупреждение: GPU {alert.gpu_id} — {alert.temperature.toFixed(1)}°C
+                    Попередження: GPU {alert.gpu_id} — {alert.temperature.toFixed(1)}°C
                   </span>
                 </div>
               </div>
@@ -133,7 +133,7 @@ export default function Dashboard() {
 
         {/* GPU Cards */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">🎮 GPU Температуры</h2>
+          <h2 className="text-2xl font-bold mb-4">🎮 Температури GPU</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {state?.gpu_temps.map(gpu => {
               const temp = gpu.temperature;
@@ -156,9 +156,9 @@ export default function Dashboard() {
                     {temp.toFixed(1)}°C
                   </div>
                   
-                  <div className="flex items-center text-sm text-gray-600">
+                  <div className="flex items-center text-sm text-gray-800">
                     <Fan className="w-4 h-4 mr-1" />
-                    <span>{systemMode?.mode === 'auto' ? 'Автоматическое' : 'Ручное'} управление</span>
+                    <span>{systemMode?.mode === 'auto' ? 'Автоматичне' : 'Ручне'} керування</span>
                   </div>
                 </div>
               );
@@ -168,7 +168,7 @@ export default function Dashboard() {
 
         {/* Fan Cards */}
         <div className="mb-8">
-          <h2 className="text-2xl font-bold mb-4">🌀 Вентиляторы</h2>
+          <h2 className="text-2xl font-bold mb-4">🌀 Вентилятори</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {fanStats.map(stats => {
               const gpuTemp = state?.gpu_temps.find(g => g.gpu_id === stats.fan_id)?.temperature || 0;
@@ -190,14 +190,14 @@ export default function Dashboard() {
             href="/history"
             className="px-6 py-3 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition"
           >
-            📊 История и графики
+            📊 Історія та графіки
           </a>
           <a
             href="/control"
             className="px-6 py-3 bg-purple-500 text-white rounded-lg hover:bg-purple-600 transition flex items-center space-x-2"
           >
             <Settings className="w-5 h-5" />
-            <span>🎛️ Ручное управление</span>
+            <span>🎛️ Ручне керування</span>
           </a>
 </div>
 </div>

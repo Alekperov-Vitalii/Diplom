@@ -23,12 +23,12 @@ export default function History() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        // Загружаем температуры
+        // Завантажуємо температури
         const tempHistory = await getHistory(hours);
         
-        // Группируем данные по времени
+        // Групуємо дані за часом
         const tempGrouped = tempHistory.reduce((acc: Record<string, ChartDataPoint>, point: HistoryDataPoint) => {
-          const time = new Date(point.time).toLocaleTimeString('ru-RU', { 
+          const time = new Date(point.time).toLocaleTimeString('uk-UA', { 
             hour: '2-digit', 
             minute: '2-digit' 
           });
@@ -40,7 +40,7 @@ export default function History() {
           if (point.measurement === 'gpu_temps' && point.gpu_id) {
             acc[time][`GPU ${point.gpu_id}`] = point.value;
           } else if (point.measurement === 'room_temp') {
-            acc[time]['Комната'] = point.value;
+            acc[time]['Кімната'] = point.value;
           }
           
           return acc;
@@ -48,14 +48,14 @@ export default function History() {
         
         setTempData(Object.values(tempGrouped));
 
-        // Загружаем данные вентиляторов
+        // Завантажуємо дані вентиляторів
         const fanHistory = await getFanHistory(hours);
         
-        // Группируем PWM по времени
+        // Групуємо PWM за часом
         const pwmGrouped = fanHistory
           .filter(p => p.field === 'pwm_duty')
           .reduce((acc: Record<string, ChartDataPoint>, point: FanHistoryDataPoint) => {
-            const time = new Date(point.time).toLocaleTimeString('ru-RU', { 
+            const time = new Date(point.time).toLocaleTimeString('uk-UA', { 
               hour: '2-digit', 
               minute: '2-digit' 
             });
@@ -71,11 +71,11 @@ export default function History() {
         
         setFanPWMData(Object.values(pwmGrouped));
 
-        // Группируем RPM по времени
+        // Групуємо RPM за часом
         const rpmGrouped = fanHistory
           .filter(p => p.field === 'rpm')
           .reduce((acc: Record<string, ChartDataPoint>, point: FanHistoryDataPoint) => {
-            const time = new Date(point.time).toLocaleTimeString('ru-RU', { 
+            const time = new Date(point.time).toLocaleTimeString('uk-UA', { 
               hour: '2-digit', 
               minute: '2-digit' 
             });
@@ -101,9 +101,9 @@ export default function History() {
     fetchData();
   }, [hours]);
 
-  if (loading) return <div className="p-8">Загрузка...</div>;
+  if (loading) return <div className="p-8">Завантаження...</div>;
 
-  // Цвета для линий GPU
+  // Кольори для ліній GPU
   const gpuColors = [
     '#ef4444', // red
     '#f97316', // orange
@@ -115,7 +115,7 @@ export default function History() {
     '#3b82f6', // blue
   ];
 
-  // Цвета для линий вентиляторов
+  // Кольори для ліній вентиляторів
   const fanColors = [
     '#8b5cf6', // violet
     '#a855f7', // purple
@@ -128,20 +128,20 @@ export default function History() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50 p-8">
+    <div className="min-h-screen bg-gray-50 text-gray-900 p-8">
       <div className="max-w-7xl mx-auto">
         <div className="mb-6">
           <Link href="/" className="flex items-center text-blue-500 hover:text-blue-600 mb-4">
             <ArrowLeft className="w-4 h-4 mr-1" />
-            Назад к Dashboard
+            Назад до Dashboard
           </Link>
-          <h1 className="text-3xl font-bold">📊 История температур и работы вентиляторов</h1>
+          <h1 className="text-3xl font-bold">📊 Історія температур та роботи вентиляторів</h1>
         </div>
 
-        {/* Выбор периода */}
+        {/* Вибір періоду */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex items-center space-x-4 mb-4">
-            <label className="font-medium">Период:</label>
+            <label className="font-medium">Період:</label>
             {[1, 3, 6, 24].map(h => (
               <button
                 key={h}
@@ -156,11 +156,11 @@ export default function History() {
           </div>
         </div>
 
-        {/* График температур GPU */}
+        {/* Графік температур GPU */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex items-center space-x-2 mb-4">
             <Thermometer className="w-6 h-6 text-red-500" />
-            <h2 className="text-xl font-bold">Температуры GPU</h2>
+            <h2 className="text-xl font-bold">Температури GPU</h2>
           </div>
 
           <ResponsiveContainer width="100%" height={400}>
@@ -192,7 +192,7 @@ export default function History() {
               ))}
               <Line 
                 type="monotone" 
-                dataKey="Комната" 
+                dataKey="Кімната" 
                 stroke="#000" 
                 strokeWidth={3} 
                 dot={false}
@@ -201,21 +201,21 @@ export default function History() {
             </LineChart>
           </ResponsiveContainer>
 
-          <div className="mt-4 text-sm text-gray-600">
-            <p>• Чёрная пунктирная линия — температура помещения</p>
-            <p>• Цветные линии — температуры каждого GPU</p>
+          <div className="mt-4 text-sm text-gray-800">
+            <p>• Чорна пунктирна лінія — температура приміщення</p>
+            <p>• Кольорові лінії — температури кожного GPU</p>
           </div>
         </div>
 
-        {/* График работы вентиляторов */}
+        {/* Графік роботи вентиляторів */}
         <div className="bg-white rounded-lg shadow p-6 mb-6">
           <div className="flex items-center justify-between mb-4">
             <div className="flex items-center space-x-2">
               <Fan className="w-6 h-6 text-purple-500" />
-              <h2 className="text-xl font-bold">Работа вентиляторов</h2>
+              <h2 className="text-xl font-bold">Робота вентиляторів</h2>
             </div>
             
-            {/* Переключатель PWM / RPM */}
+            {/* Перемикач PWM / RPM */}
             <div className="flex space-x-2">
               <button
                 onClick={() => setActiveChart('pwm')}
@@ -240,7 +240,7 @@ export default function History() {
             </div>
           </div>
 
-          {/* График PWM */}
+          {/* Графік PWM */}
           {activeChart === 'pwm' && (
             <>
               <ResponsiveContainer width="100%" height={400}>
@@ -285,15 +285,15 @@ export default function History() {
                 ))}
               </div>
 
-              <div className="mt-4 text-sm text-gray-600">
-                <p>• Линии показывают изменение PWM (мощности) вентиляторов во времени</p>
-                <p>• Ступенчатая форма графика отражает дискретные изменения управляющих команд</p>
-                <p>• Чем выше линия, тем сильнее работал вентилятор в данный момент</p>
+              <div className="mt-4 text-sm text-gray-800">
+                <p>• Лінії показують зміну PWM (потужності) вентиляторів у часі</p>
+                <p>• Ступінчаста форма графіка відображає дискретні зміни керуючих команд</p>
+                <p>• Чим вище лінія, тим сильніше працював вентилятор у даний момент</p>
               </div>
             </>
           )}
 
-          {/* График RPM */}
+          {/* Графік RPM */}
           {activeChart === 'rpm' && (
             <>
               <ResponsiveContainer width="100%" height={400}>
@@ -305,7 +305,7 @@ export default function History() {
                     interval="preserveStartEnd"
                   />
                   <YAxis 
-                    label={{ value: 'Обороты (RPM)', angle: -90, position: 'insideLeft' }}
+                    label={{ value: 'Оберти (RPM)', angle: -90, position: 'insideLeft' }}
                     domain={[500, 5500]}
                   />
                   <Tooltip 
@@ -326,22 +326,22 @@ export default function History() {
                 </LineChart>
               </ResponsiveContainer>
 
-              <div className="mt-4 text-sm text-gray-600">
-                <p>• Показывает фактические обороты (RPM) вентиляторов</p>
-                <p>• Минимум: ~800 RPM (20% PWM), Максимум: ~5000 RPM (100% PWM)</p>
+              <div className="mt-4 text-sm text-gray-800">
+                <p>• Показує фактичні оберти (RPM) вентиляторів</p>
+                <p>• Мінімум: ~800 RPM (20% PWM), Максимум: ~5000 RPM (100% PWM)</p>
               </div>
             </>
           )}
         </div>
 
-        {/* Аналитика */}
+        {/* Аналітика */}
         <div className="bg-blue-50 border-l-4 border-blue-500 p-6 rounded-lg">
-          <h3 className="font-bold text-lg mb-2">📈 Как читать графики</h3>
-          <div className="space-y-2 text-sm text-gray-700">
-            <p><strong>График температур:</strong> Показывает как GPU нагреваются под нагрузкой и остывают благодаря вентиляторам</p>
-            <p><strong>График PWM вентиляторов:</strong> Демонстрирует работу адаптивного алгоритма — PWM увеличивается когда GPU греются</p>
-            <p><strong>Корреляция:</strong> Сравните оба графика: когда температура GPU растёт → PWM вентилятора увеличивается через 30-60 секунд</p>
-            <p><strong>Эффективность:</strong> Если GPU быстро остывает после увеличения PWM → система охлаждения работает эффективно</p>
+          <h3 className="font-bold text-lg mb-2">📈 Як читати графіки</h3>
+          <div className="space-y-2 text-sm text-gray-900">
+            <p><strong>Графік температур:</strong> Показує як GPU нагріваються під навантаженням і остигають завдяки вентиляторам</p>
+            <p><strong>Графік PWM вентиляторів:</strong> Демонструє роботу адаптивного алгоритму — PWM збільшується коли GPU гріються</p>
+            <p><strong>Кореляція:</strong> Порівняйте обидва графіки: коли температура GPU зростає → PWM вентилятора збільшується через 30-60 секунд</p>
+            <p><strong>Ефективність:</strong> Якщо GPU швидко остигає після збільшення PWM → система охолодження працює ефективно</p>
           </div>
         </div>
       </div>
