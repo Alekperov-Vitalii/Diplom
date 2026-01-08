@@ -135,7 +135,9 @@ export default function Dashboard() {
         <div className="mb-8">
           <h2 className="text-2xl font-bold mb-4">🎮 Температури GPU</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-            {state?.gpu_temps.map(gpu => {
+            {state?.gpu_temps
+              .sort((a, b) => a.gpu_id - b.gpu_id)
+              .map(gpu => {
               const temp = gpu.temperature;
               const isHot = temp >= 90;
               const isWarm = temp >= 70;

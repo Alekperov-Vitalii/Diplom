@@ -53,11 +53,11 @@ config = Config()
 # ============================================================================
 
 class GPUTemperature(BaseModel):
-    gpu_id: int = Field(..., ge=1, le=8)
+    gpu_id: int = Field(..., ge=1, le=16)
     temperature: float
 
 class FanState(BaseModel):
-    fan_id: int = Field(..., ge=1, le=8)
+    fan_id: int = Field(..., ge=1, le=16)
     rpm: int
     pwm_duty: int
 
@@ -100,7 +100,7 @@ class ManualControlMode(BaseModel):
 
 class FanManualControl(BaseModel):
     """Ручная установка PWM для вентилятора"""
-    fan_id: int = Field(..., ge=1, le=8)
+    fan_id: int = Field(..., ge=1, le=16)
     pwm_duty: int = Field(..., ge=0, le=100)
 
 class FanManualControlBatch(BaseModel):

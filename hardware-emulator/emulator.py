@@ -11,8 +11,9 @@ from typing import List
 
 from models import TelemetryPayload, SensorData, FanData, GPUTemperature
 from gpu_simulator import GPUSimulator, RoomSimulator
-from fan_controller import FanController
-from api_client import FogServerClient
+from actuators.fan_controller import FanController
+from edge_gateway.esp32_gateway import ESP32Gateway
+from core.workload_profiles import WorkloadOrchestrator
 from logger_config import setup_logger
 
 logger = setup_logger(__name__, level=logging.INFO)
@@ -37,7 +38,7 @@ class ESP32Emulator:
         self.device_id = self.config['device']['id']
         self.gpu_count = self.config['device']['gpu_count']
         
-        # Создаём симуляторы GPU (8 штук)
+        # Создаём симуляторы GPU
         logger.info(f"Создание {self.gpu_count} симуляторов GPU...")
         self.gpus: List[GPUSimulator] = []
         for gpu_id in range(1, self.gpu_count + 1):
@@ -50,14 +51,23 @@ class ESP32Emulator:
         self.room = RoomSimulator(self.config)
         logger.debug(f"  Температура помещения: {self.room.temperature:.1f}°C")
         
+        # Оркестратор нагрузки (ML профили)
+        logger.info("Инициализация WorkloadOrchestrator...")
+        self.workload_orchestrator = WorkloadOrchestrator(self.config)
+        if self.config.get('workload_profiles', {}).get('datacenter_ml', {}).get('enabled', False):
+            logger.info("  ✓ ML профили активированы (datacenter mode)")
+        else:
+            logger.info("  ℹ Используется классическая случайная нагрузка")
+        
         # Контроллер вентиляторов
         logger.info(f"Инициализация {self.gpu_count} вентиляторов...")
         self.fan_controller = FanController(self.gpu_count, self.config)
         
-        # HTTP-клиент для связи с fog-сервером
+        # Edge Gateway (ESP32)
         fog_url = f"http://{self.config['fog_server']['host']}:{self.config['fog_server']['port']}"
-        logger.info(f"Настройка связи с fog-сервером: {fog_url}")
-        self.api_client = FogServerClient(fog_url)
+        logger.info(f"Инициализация ESP32 Edge Gateway...")
+        logger.info(f"  Fog-сервер: {fog_url}")
+        self.gateway = ESP32Gateway(self.device_id, fog_url, logger)
         
         # Параметры таймингов
         self.sensor_read_interval = self.config['timing']['sensor_read_interval']
@@ -93,10 +103,12 @@ class ESP32Emulator:
         Читает все датчики и обновляет физику
         Вызывается каждые 5 секунд
         """
-        # 1. Обновляем нагрузку на случайных GPU
-        for gpu in self.gpus:
-            if self.config['workload']['enabled']:
-                gpu.update_workload()
+        # 1. Обновляем нагрузку через WorkloadOrchestrator
+        if self.workload_orchestrator.should_update_workload():
+            for i, gpu in enumerate(self.gpus):
+                gpu_id = i + 1
+                new_workload = self.workload_orchestrator.get_workload_for_gpu(gpu_id)
+                gpu.set_workload(new_workload)
         
         # 2. Вычисляем вклад GPU в нагрев помещения
         gpu_heat_contribution = sum(
@@ -175,20 +187,19 @@ class ESP32Emulator:
     
     def _send_data(self):
         """
-        Отправляет накопленные данные на fog-сервер
+        Отправляет накопленные данные на fog-сервер через ESP32 Gateway
         Вызывается каждые 30 секунд
         """
         payload = self._create_telemetry_payload()
         
-        logger.info(f"📤 Отправка телеметрии #{self.total_sends + 1}...")
-        
-        success = self.api_client.send_telemetry(payload)
+        # Отправляем через Gateway
+        success = self.gateway.send_telemetry(payload)
         
         if success:
             self.total_sends += 1
             
             # Пытаемся получить команды управления
-            commands = self.api_client.fetch_fan_commands(self.device_id)
+            commands = self.gateway.receive_commands()
             if commands:
                 self._apply_fan_commands(commands)
         else:
@@ -230,7 +241,7 @@ class ESP32Emulator:
         logger.info("=" * 60)
         
         # Проверяем доступность fog-сервера
-        if not self.api_client.health_check():
+        if not self.gateway.health_check():
             logger.warning("⚠ Fog-сервер недоступен! Эмулятор будет работать, но данные не отправятся.")
             logger.warning("  Убедитесь что fog-сервер запущен на порту 8001")
         

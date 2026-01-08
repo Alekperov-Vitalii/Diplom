@@ -51,7 +51,7 @@ export default function Control() {
   useEffect(() => {
     if (Object.keys(fanPWM).length === 0) {
       const initialPWM: { [key: number]: number } = {};
-      for (let i = 1; i <= 8; i++) {
+      for (let i = 1; i <= 16; i++) {
         initialPWM[i] = 20;
       }
       setFanPWM(initialPWM);
@@ -79,7 +79,7 @@ export default function Control() {
 
     // Перевірка: попередження про гарячі GPU
     const warnings = [];
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 16; i++) {
       const gpuTemp = state?.gpu_temps.find(g => g.gpu_id === i)?.temperature || 0;
       const pwm = fanPWM[i];
       
@@ -126,7 +126,7 @@ export default function Control() {
     };
     
     const newPWM: { [key: number]: number } = {};
-    for (let i = 1; i <= 8; i++) {
+    for (let i = 1; i <= 16; i++) {
       newPWM[i] = profiles[profile];
     }
     setFanPWM(newPWM);
@@ -235,7 +235,7 @@ export default function Control() {
               <h2 className="text-xl font-bold mb-4">Налаштування вентиляторів</h2>
               
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map(fanId => {
+                {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16].map(fanId => {
                   const gpuTemp = state?.gpu_temps.find(g => g.gpu_id === fanId)?.temperature || 0;
                   const pwm = fanPWM[fanId] || 20;
                   const rpm = Math.round(800 + (5000 - 800) * pwm / 100);

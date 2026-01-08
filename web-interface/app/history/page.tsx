@@ -103,7 +103,7 @@ export default function History() {
 
   if (loading) return <div className="p-8">Завантаження...</div>;
 
-  // Кольори для ліній GPU
+  // Кольори для ліній GPU (16 кольорів)
   const gpuColors = [
     '#ef4444', // red
     '#f97316', // orange
@@ -113,9 +113,17 @@ export default function History() {
     '#22c55e', // green
     '#06b6d4', // cyan
     '#3b82f6', // blue
+    '#8b5cf6', // violet
+    '#a855f7', // purple
+    '#d946ef', // fuchsia
+    '#ec4899', // pink
+    '#f43f5e', // rose
+    '#6366f1', // indigo
+    '#0ea5e9', // sky
+    '#14b8a6', // teal
   ];
 
-  // Кольори для ліній вентиляторів
+  // Кольори для ліній вентиляторів (16 кольорів)
   const fanColors = [
     '#8b5cf6', // violet
     '#a855f7', // purple
@@ -125,6 +133,14 @@ export default function History() {
     '#6366f1', // indigo
     '#0ea5e9', // sky
     '#14b8a6', // teal
+    '#ef4444', // red
+    '#f97316', // orange
+    '#f59e0b', // amber
+    '#eab308', // yellow
+    '#84cc16', // lime
+    '#22c55e', // green
+    '#06b6d4', // cyan
+    '#3b82f6', // blue
   ];
 
   return (
@@ -178,9 +194,10 @@ export default function History() {
               <Tooltip 
                 contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #ccc' }}
                 labelStyle={{ fontWeight: 'bold' }}
+                formatter={(value: number) => `${Number(value).toFixed(1)}°C`}
               />
               <Legend />
-              {[1,2,3,4,5,6,7,8].map((id, idx) => (
+              {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((id, idx) => (
                 <Line 
                   key={id} 
                   type="monotone" 
@@ -258,9 +275,10 @@ export default function History() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #ccc' }}
                     labelStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: number) => `${Number(value).toFixed(0)}%`}
                   />
                   <Legend />
-                  {[1,2,3,4,5,6,7,8].map((id, idx) => (
+                  {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((id, idx) => (
                     <Line 
                       key={id} 
                       type="stepAfter"
@@ -274,7 +292,7 @@ export default function History() {
               </ResponsiveContainer>
 
               <div className="mt-4 grid grid-cols-2 md:grid-cols-4 gap-4">
-                {[1,2,3,4,5,6,7,8].map((id, idx) => (
+                {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((id, idx) => (
                   <div key={id} className="flex items-center space-x-2">
                     <div 
                       className="w-4 h-4 rounded"
@@ -311,9 +329,10 @@ export default function History() {
                   <Tooltip 
                     contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #ccc' }}
                     labelStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: number) => `${Number(value).toFixed(0)} RPM`}
                   />
                   <Legend />
-                  {[1,2,3,4,5,6,7,8].map((id, idx) => (
+                  {[1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16].map((id, idx) => (
                     <Line 
                       key={id} 
                       type="stepAfter"

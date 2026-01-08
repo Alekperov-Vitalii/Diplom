@@ -10,7 +10,7 @@ from datetime import datetime
 
 class GPUTemperature(BaseModel):
     """Температура одной видеокарты"""
-    gpu_id: int = Field(..., ge=1, le=8, description="ID видеокарты (1-8)")
+    gpu_id: int = Field(..., ge=1, le=16, description="ID видеокарты (1-16)")
     temperature: float = Field(..., ge=-10, le=150, description="Температура в °C")
     
     class Config:
@@ -24,7 +24,7 @@ class GPUTemperature(BaseModel):
 
 class FanState(BaseModel):
     """Состояние вентилятора"""
-    fan_id: int = Field(..., ge=1, le=8, description="ID вентилятора (1-8)")
+    fan_id: int = Field(..., ge=1, le=16, description="ID вентилятора (1-16)")
     rpm: int = Field(..., ge=0, le=6000, description="Обороты в минуту")
     pwm_duty: int = Field(..., ge=0, le=100, description="PWM duty cycle (%)")
     
@@ -86,7 +86,7 @@ class FanControlCommand(BaseModel):
     Команда управления вентиляторами от fog-сервера
     Fog-сервер отправляет эту команду эмулятору
     """
-    fan_id: int = Field(..., ge=1, le=8, description="ID вентилятора")
+    fan_id: int = Field(..., ge=1, le=16, description="ID вентилятора")
     pwm_duty: int = Field(..., ge=0, le=100, description="Новое значение PWM (0-100%)")
     
     class Config:
