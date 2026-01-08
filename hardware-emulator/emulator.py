@@ -144,8 +144,9 @@ class ESP32Emulator:
         for i, gpu in enumerate(self.gpus):
             fan_id = i + 1
             fan_state = self.fan_controller.fans[fan_id]
+            profile_name = self.workload_orchestrator.get_profile_name_for_gpu(gpu.gpu_id)
             logger.info(
-                f"  GPU {gpu.gpu_id}: {gpu.temperature:.1f}°C "
+                f"  GPU {gpu.gpu_id} ({profile_name}): {gpu.temperature:.1f}°C "
                 f"[Нагрузка: {gpu.workload*100:3.0f}%] | "
                 f"Вентилятор: {fan_state['rpm']:4d} RPM (PWM: {fan_state['pwm']:3d}%)"
             )
@@ -161,7 +162,8 @@ class ESP32Emulator:
         gpu_temps = [
             GPUTemperature(
                 gpu_id=gpu.gpu_id,
-                temperature=gpu.get_temperature_with_noise()
+                temperature=gpu.get_temperature_with_noise(),
+                workload=gpu.workload
             )
             for gpu in self.gpus
         ]

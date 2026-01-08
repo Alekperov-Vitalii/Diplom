@@ -173,12 +173,15 @@ export default function Dashboard() {
           <h2 className="text-2xl font-bold mb-4">🌀 Вентилятори</h2>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
             {fanStats.map(stats => {
-              const gpuTemp = state?.gpu_temps.find(g => g.gpu_id === stats.fan_id)?.temperature || 0;
+              const gpuData = state?.gpu_temps.find(g => g.gpu_id === stats.fan_id);
+              const gpuTemp = gpuData?.temperature || 0;
+              const workload = gpuData?.workload || 0;
               return (
                 <FanCard
                   key={stats.fan_id}
                   stats={stats}
                   gpuTemp={gpuTemp}
+                  workload={workload}
                   mode={systemMode?.mode || 'auto'}
                 />
               );

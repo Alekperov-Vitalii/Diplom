@@ -181,6 +181,28 @@ class WorkloadOrchestrator:
         idle_profile = IdleWorkloadProfile(self.config)
         return idle_profile.get_workload()
     
+    def get_profile_name_for_gpu(self, gpu_id: int) -> str:
+        """
+        Возвращает имя профиля для конкретной GPU
+        
+        Args:
+            gpu_id: ID видеокарты
+        
+        Returns:
+            Имя профиля ("training", "inference", "idle")
+        """
+        # Ищем, к какой группе принадлежит GPU
+        for group_name, group_data in self.groups.items():
+            if gpu_id in group_data['gpus']:
+                profile = group_data['profile']
+                if isinstance(profile, TrainingWorkloadProfile):
+                    return "training"
+                elif isinstance(profile, InferenceWorkloadProfile):
+                    return "inference"
+        
+        # Если GPU не в группе, idle
+        return "idle"
+    
     def should_update_workload(self) -> bool:
         """
         Определяет, нужно ли обновлять нагрузку

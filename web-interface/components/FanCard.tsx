@@ -6,10 +6,11 @@ import { FanStatistics } from '@/lib/api';
 interface FanCardProps {
   stats: FanStatistics;
   gpuTemp: number;
+  workload: number;
   mode: 'auto' | 'manual';
 }
 
-export default function FanCard({ stats, gpuTemp, mode }: FanCardProps) {
+export default function FanCard({ stats, gpuTemp, workload, mode }: FanCardProps) {
   const { fan_id, current_pwm, current_rpm, avg_pwm_last_hour, time_on_high } = stats;
   
   // Визначаємо колір на основі PWM
@@ -49,9 +50,24 @@ export default function FanCard({ stats, gpuTemp, mode }: FanCardProps) {
         </div>
       </div>
       
-      {/* GPU температура */}
+      {/* GPU температура и нагрузка */}
       <div className="mb-3 text-sm text-gray-800">
-        GPU {fan_id}: <span className="font-semibold">{gpuTemp.toFixed(1)}°C</span>
+        <div>GPU {fan_id}: <span className="font-semibold">{gpuTemp.toFixed(1)}°C</span></div>
+        <div className="mt-1">
+          <div className="flex justify-between text-xs mb-1">
+            <span>Нагрузка</span>
+            <span className="font-bold">{(workload * 100).toFixed(0)}%</span>
+          </div>
+          <div className="w-full bg-gray-200 rounded-full h-2">
+            <div
+              className={`h-2 rounded-full transition-all duration-300 ${
+                workload < 0.3 ? 'bg-blue-400' :
+                workload < 0.7 ? 'bg-orange-400' : 'bg-red-500'
+              }`}
+              style={{ width: `${workload * 100}%` }}
+            />
+          </div>
+        </div>
       </div>
       
       {/* PWM шкала */}

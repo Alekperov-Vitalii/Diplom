@@ -16,6 +16,7 @@ from pydantic import BaseModel, Field
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timezone, timedelta
 from contextlib import asynccontextmanager
+from enum import Enum
 import asyncio
 import os
 from dotenv import load_dotenv
@@ -55,6 +56,7 @@ config = Config()
 class GPUTemperature(BaseModel):
     gpu_id: int = Field(..., ge=1, le=16)
     temperature: float
+    workload: float = Field(..., ge=0.0, le=1.0)  # Процент загрузки GPU (0.0-1.0)
 
 class FanState(BaseModel):
     fan_id: int = Field(..., ge=1, le=16)
@@ -175,6 +177,7 @@ class InfluxDBManager:
                 .tag("device_id", payload.device_id) \
                 .tag("gpu_id", str(gpu_temp.gpu_id)) \
                 .field("temperature", gpu_temp.temperature) \
+                .field("workload", gpu_temp.workload) \
                 .time(payload.timestamp)
             points.append(point)
         
@@ -209,31 +212,35 @@ class InfluxDBManager:
         
         self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=point)
     
-    def query_latest_temps(self) -> Dict[int, float]:
+    def query_latest_gpu_data(self) -> Dict[int, Dict[str, float]]:
         """
-        Получает последние температуры всех GPU
+        Получает последние температуры и workload всех GPU
         
         Returns:
-            {gpu_id: temperature}
+            {gpu_id: {"temperature": float, "workload": float}}
         """
         query = f'''
         from(bucket: "{config.INFLUXDB_BUCKET}")
           |> range(start: -1m)
           |> filter(fn: (r) => r["_measurement"] == "gpu_temps")
-          |> filter(fn: (r) => r["_field"] == "temperature")
+          |> filter(fn: (r) => r["_field"] == "temperature" or r["_field"] == "workload")
           |> last()
         '''
         
         result = self.query_api.query(query=query)
         
-        temps = {}
+        gpu_data = {}
         for table in result:
             for record in table.records:
                 gpu_id = int(record.values.get("gpu_id"))
-                temp = record.values.get("_value")
-                temps[gpu_id] = temp
+                field = record.values.get("_field")
+                value = record.values.get("_value")
+                
+                if gpu_id not in gpu_data:
+                    gpu_data[gpu_id] = {}
+                gpu_data[gpu_id][field] = value
         
-        return temps
+        return gpu_data
     
     def query_history(self, hours: int = 1) -> List[Dict[str, Any]]:
         """
@@ -246,7 +253,7 @@ class InfluxDBManager:
         from(bucket: "{config.INFLUXDB_BUCKET}")
           |> range(start: -{hours}h)
           |> filter(fn: (r) => r["_measurement"] == "gpu_temps" or r["_measurement"] == "room_temp")
-          |> filter(fn: (r) => r["_field"] == "temperature")
+          |> filter(fn: (r) => r["_field"] == "temperature" or r["_field"] == "workload")
         '''
         
         result = self.query_api.query(query=query)
@@ -258,6 +265,7 @@ class InfluxDBManager:
                     "time": record.values.get("_time").isoformat(),
                     "measurement": record.values.get("_measurement"),
                     "gpu_id": record.values.get("gpu_id"),
+                    "field": record.values.get("_field"),  # "temperature" или "workload"
                     "value": record.values.get("_value")
                 })
         
@@ -269,18 +277,70 @@ influx_manager = InfluxDBManager()
 # АЛГОРИТМ УПРАВЛЕНИЯ ОХЛАЖДЕНИЕМ
 # ============================================================================
 
+class ThermalState(Enum):
+    """Состояние нагрева GPU"""
+    HEATING = "heating"    # Температура растёт
+    STEADY = "steady"      # Температура стабильна
+    COOLING = "cooling"    # Температура падает
+
 class CoolingAlgorithm:
     """
-    Каскадный адаптивный алгоритм управления охлаждением
+    Каскадный адаптивный алгоритм управления охлаждением с учётом трендов
     
     Принцип:
-    1. Базовый PWM зависит от температуры GPU
-    2. Коррекция на основе температуры помещения
-    3. Фильтрация резких изменений (сглаживание)
+    1. Определение thermal state (heating/steady/cooling)
+    2. Разные шаги PWM для роста и падения температуры
+    3. Минимальное время удержания PWM
+    4. Базовый PWM зависит от температуры GPU
+    5. Коррекция на основе температуры помещения
+    6. Фильтрация резких изменений (сглаживание)
     """
     
     def __init__(self):
-        self.previous_pwm: Dict[int, int] = {}  # Предыдущие значения PWM
+        # Предыдущие температуры для определения тренда
+        self.previous_temps: Dict[int, float] = {}
+        
+        # Время последнего изменения PWM для каждого вентилятора
+        self.last_pwm_change: Dict[int, datetime] = {}
+        
+        # Текущие значения PWM
+        self.current_pwm: Dict[int, int] = {}
+        
+        # Параметры алгоритма
+        self.epsilon = 0.5  # °C - порог для определения тренда
+        self.pwm_up_step = 8   # Шаг увеличения PWM (%)
+        self.pwm_down_step = 3 # Шаг уменьшения PWM (%)
+        self.min_hold_time = 60  # Минимальное время удержания PWM (секунды)
+    
+    def get_thermal_state(self, gpu_id: int, current_temp: float) -> ThermalState:
+        """
+        Определяет состояние нагрева GPU на основе тренда температуры
+        
+        Args:
+            gpu_id: ID GPU
+            current_temp: Текущая температура
+        
+        Returns:
+            ThermalState: heating, steady, или cooling
+        """
+        if gpu_id not in self.previous_temps:
+            # Первое измерение - считаем steady
+            self.previous_temps[gpu_id] = current_temp
+            return ThermalState.STEADY
+        
+        # Вычисляем дельту температуры
+        delta = current_temp - self.previous_temps[gpu_id]
+        
+        # Обновляем предыдущую температуру
+        self.previous_temps[gpu_id] = current_temp
+        
+        # Определяем состояние
+        if delta > self.epsilon:
+            return ThermalState.HEATING
+        elif delta < -self.epsilon:
+            return ThermalState.COOLING
+        else:
+            return ThermalState.STEADY
     
     def calculate_base_pwm(self, gpu_temp: float) -> int:
         """
@@ -324,33 +384,68 @@ class CoolingAlgorithm:
         # Ограничиваем диапазон
         return max(config.MIN_FAN_PWM, min(corrected_pwm, config.MAX_FAN_PWM))
     
+    def calculate_pwm_with_trend(self, fan_id: int, gpu_temp: float, thermal_state: ThermalState) -> int:
+        """
+        Вычисляет PWM с учётом тренда температуры
+        
+        Args:
+            fan_id: ID вентилятора
+            gpu_temp: Текущая температура GPU
+            thermal_state: Состояние нагрева
+        
+        Returns:
+            Новое значение PWM
+        """
+        # Базовый PWM от температуры
+        base_pwm = self.calculate_base_pwm(gpu_temp)
+        
+        # Получаем текущее PWM
+        current_pwm = self.current_pwm.get(fan_id, config.MIN_FAN_PWM)
+        
+        # Проверяем минимальное время удержания
+        now = datetime.now(timezone.utc)
+        if fan_id in self.last_pwm_change:
+            time_since_change = (now - self.last_pwm_change[fan_id]).total_seconds()
+            if time_since_change < self.min_hold_time:
+                # Не меняем PWM, если прошло мало времени
+                return current_pwm
+        
+        # Выбираем шаг в зависимости от состояния
+        if thermal_state == ThermalState.HEATING:
+            # Температура растёт - увеличиваем PWM быстро
+            step = self.pwm_up_step
+            target_pwm = min(current_pwm + step, config.MAX_FAN_PWM)
+        elif thermal_state == ThermalState.COOLING:
+            # Температура падает - уменьшаем PWM медленно
+            step = self.pwm_down_step
+            target_pwm = max(current_pwm - step, config.MIN_FAN_PWM)
+        else:
+            # Температура стабильна - стремимся к базовому PWM
+            if abs(current_pwm - base_pwm) > 5:
+                if current_pwm < base_pwm:
+                    target_pwm = min(current_pwm + self.pwm_down_step, base_pwm)
+                else:
+                    target_pwm = max(current_pwm - self.pwm_down_step, base_pwm)
+            else:
+                target_pwm = current_pwm
+        
+        # Обновляем состояние
+        if target_pwm != current_pwm:
+            self.last_pwm_change[fan_id] = now
+        
+        self.current_pwm[fan_id] = target_pwm
+        return target_pwm
+    
     def smooth_pwm(self, fan_id: int, new_pwm: int) -> int:
         """
-        Сглаживает резкие изменения PWM
-        
-        Логика:
-        - Если изменение < 10% → не меняем (избегаем дёрганий)
-        - Если изменение > 10% → применяем постепенно
+        Устаревший метод для совместимости
+        Теперь используется calculate_pwm_with_trend
         """
-        if fan_id not in self.previous_pwm:
-            self.previous_pwm[fan_id] = new_pwm
-            return new_pwm
-        
-        prev_pwm = self.previous_pwm[fan_id]
-        diff = abs(new_pwm - prev_pwm)
-        
-        if diff < 10:
-            # Малое изменение → игнорируем
-            return prev_pwm
-        else:
-            # Большое изменение → применяем на 50% (плавный переход)
-            smoothed = int((prev_pwm + new_pwm) / 2)
-            self.previous_pwm[fan_id] = smoothed
-            return smoothed
+        return new_pwm
     
     def calculate_fan_commands(self, payload: TelemetryPayload) -> FanControlBatch:
         """
-        Главная функция: вычисляет команды для всех вентиляторов
+        Главная функция: вычисляет команды для всех вентиляторов с учётом трендов
         
         Args:
             payload: Телеметрия от ESP32
@@ -364,18 +459,21 @@ class CoolingAlgorithm:
         for gpu_temp in payload.sensors.gpu_temps:
             fan_id = gpu_temp.gpu_id  # Вентилятор 1 охлаждает GPU 1
             
-            # 1. Базовый PWM
-            base_pwm = self.calculate_base_pwm(gpu_temp.temperature)
+            # 1. Определяем thermal state
+            thermal_state = self.get_thermal_state(fan_id, gpu_temp.temperature)
             
-            # 2. Коррекция на комнату
-            corrected_pwm = self.apply_room_correction(base_pwm, room_temp)
+            # 2. Вычисляем PWM с учётом тренда
+            base_pwm = self.calculate_pwm_with_trend(fan_id, gpu_temp.temperature, thermal_state)
             
-            # 3. Сглаживание
-            final_pwm = self.smooth_pwm(fan_id, corrected_pwm)
+            # 3. Коррекция на комнату (только если не в режиме быстрого реагирования)
+            if thermal_state != ThermalState.HEATING:
+                corrected_pwm = self.apply_room_correction(base_pwm, room_temp)
+            else:
+                corrected_pwm = base_pwm  # При нагреве игнорируем коррекцию комнаты
             
             commands.append(FanControlCommand(
                 fan_id=fan_id,
-                pwm_duty=final_pwm
+                pwm_duty=corrected_pwm
             ))
         
         return FanControlBatch(
@@ -600,10 +698,18 @@ async def get_fan_commands(device_id: str):
 async def get_current_state():
     """API для веб-интерфейса: текущее состояние системы"""
     try:
-        temps = influx_manager.query_latest_temps()
+        gpu_data = influx_manager.query_latest_gpu_data()
+        
+        gpu_temps = []
+        for gpu_id, data in gpu_data.items():
+            gpu_temps.append({
+                "gpu_id": gpu_id,
+                "temperature": data.get("temperature", 0.0),
+                "workload": data.get("workload", 0.0)
+            })
         
         return {
-            "gpu_temps": [{"gpu_id": k, "temperature": v} for k, v in temps.items()],
+            "gpu_temps": gpu_temps,
             "alerts": list(alert_manager.active_alerts.values()),
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
