@@ -161,7 +161,8 @@ class ESP32Emulator:
         gpu_temps = [
             GPUTemperature(
                 gpu_id=gpu.gpu_id,
-                temperature=gpu.get_temperature_with_noise()
+                temperature=gpu.get_temperature_with_noise(),
+                load=round(gpu.workload * 100, 1)
             )
             for gpu in self.gpus
         ]

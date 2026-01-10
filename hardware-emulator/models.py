@@ -12,12 +12,14 @@ class GPUTemperature(BaseModel):
     """Температура одной видеокарты"""
     gpu_id: int = Field(..., ge=1, le=16, description="ID видеокарты (1-16)")
     temperature: float = Field(..., ge=-10, le=150, description="Температура в °C")
+    load: float = Field(0.0, ge=0.0, le=100.0, description="Загрузка GPU (%)")
     
     class Config:
         json_schema_extra = {
             "example": {
                 "gpu_id": 1,
-                "temperature": 68.5
+                "temperature": 68.5,
+                "load": 95.0
             }
         }
 

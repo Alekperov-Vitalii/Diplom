@@ -154,8 +154,24 @@ export default function Dashboard() {
                     <Thermometer className={`w-6 h-6 ${isHot ? 'text-red-500' : isWarm ? 'text-yellow-500' : 'text-green-500'}`} />
                   </div>
                   
-                  <div className="text-3xl font-bold mb-1">
+                  <div className="text-3xl font-bold mb-4">
                     {temp.toFixed(1)}°C
+                  </div>
+                  
+                  <div className="mb-4">
+                    <div className="flex justify-between text-xs text-gray-600 mb-1">
+                      <span>Навантаження GPU</span>
+                      <span className="font-semibold">{gpu.load ? gpu.load.toFixed(0) : 0}%</span>
+                    </div>
+                    <div className="w-full bg-gray-100 rounded-full h-2">
+                      <div 
+                        className={`h-2 rounded-full transition-all duration-500 ${
+                          (gpu.load || 0) > 90 ? 'bg-red-500' : 
+                          (gpu.load || 0) > 50 ? 'bg-blue-500' : 'bg-green-500'
+                        }`}
+                        style={{ width: `${gpu.load || 0}%` }}
+                      ></div>
+                    </div>
                   </div>
                   
                   <div className="flex items-center text-sm text-gray-800">

@@ -25,10 +25,10 @@ class MLWorkloadProfile:
         self.config = config
         self.start_time = time.time()
     
-    def get_workload(self) -> float:
+    def get_workload(self, gpu_id: int = 0) -> float:
         """
         Возвращает текущую нагрузку (0.0-1.0)
-        Должен быть переопределен в наследниках
+        gpu_id используется для десинхронизации профилей разных карт
         """
         raise NotImplementedError
 
@@ -50,9 +50,13 @@ class TrainingWorkloadProfile(MLWorkloadProfile):
         self.validation_interval = validation_interval
         self.validation_duration = 10  # секунды
         
-    def get_workload(self) -> float:
+    def get_workload(self, gpu_id: int = 0) -> float:
         """Возвращает нагрузку в зависимости от фазы обучения"""
-        elapsed = time.time() - self.start_time
+        # Десинхронизация: сдвиг по времени для каждой GPU
+        # Чтобы они не начинали эпохи одновременно
+        time_offset = gpu_id * 47.0 # Случайное смещение
+        
+        elapsed = time.time() - self.start_time + time_offset
         cycle_time = elapsed % self.epoch_duration
         
         # Фаза warmup (первые 30 секунд эпохи)
@@ -64,11 +68,19 @@ class TrainingWorkloadProfile(MLWorkloadProfile):
         # Проверяем, не время ли валидации
         time_since_last_validation = cycle_time % self.validation_interval
         if time_since_last_validation < self.validation_duration:
-            # Валидация: средняя нагрузка
-            return random.uniform(0.5, 0.7)
+            # Валидация: средняя нагрузка (с вариацией по GPU)
+            # Используем gpu_id как seed для "стабильного" рандома в этот момент времени
+            random.seed(int(elapsed) + gpu_id)
+            load = random.uniform(0.5, 0.7)
+            random.seed() # Reset seed
+            return load
         
         # Основное обучение: высокая стабильная нагрузка
-        return random.uniform(0.85, 1.0)
+        # Тоже добавляем микро-вариации
+        random.seed(int(elapsed * 10) + gpu_id)
+        load = random.uniform(0.85, 1.0)
+        random.seed()
+        return load
 
 
 class InferenceWorkloadProfile(MLWorkloadProfile):
@@ -89,21 +101,40 @@ class InferenceWorkloadProfile(MLWorkloadProfile):
         self.last_spike_time = 0
         self.spike_duration = 15  # секунды
     
-    def get_workload(self) -> float:
+    def get_workload(self, gpu_id: int = 0) -> float:
         """Возвращает нагрузку с периодическими пиками"""
         current_time = time.time()
         
-        # Случайные пики нагрузки (каждые ~2 минуты)
-        if current_time - self.last_spike_time > random.uniform(100, 140):
-            self.last_spike_time = current_time
+        # У каждой GPU свои пики
+        # Используем gpu_id для смещения времени проверки пиков
+        seed_offset = gpu_id * 1000
         
-        # Проверяем, в пике ли мы сейчас
-        if current_time - self.last_spike_time < self.spike_duration:
-            # Пик: высокая нагрузка
-            return random.uniform(0.85, 1.0)
+        # Чтобы пики были детерминированы по времени но случайны для GPU,
+        # можно использовать простую функцию от времени и ID
+        
+        # Простой вариант: сдвиг времени для каждого GPU для расчета "последнего пика"
+        # Но мы не храним состояние per-GPU в этом классе (он общий).
+        # Поэтому используем полностью stateless подход на основе времени
+        
+        # Симулируем пик каждые 120 сек + смещение
+        cycle_duration = 120.0
+        time_offset = gpu_id * 17.0
+        local_time = current_time + time_offset
+        
+        cycle_pos = local_time % cycle_duration
+        
+        if cycle_pos < self.spike_duration:
+             # Пик: высокая нагрузка
+             random.seed(int(current_time) + gpu_id)
+             load = random.uniform(0.85, 1.0)
+             random.seed()
+             return load
         
         # Обычная работа: стабильная средняя нагрузка
-        return self.base_load + random.uniform(-self.variation, self.variation)
+        random.seed(int(current_time * 10) + gpu_id)
+        load = self.base_load + random.uniform(-self.variation, self.variation)
+        random.seed()
+        return load
 
 
 class IdleWorkloadProfile(MLWorkloadProfile):
@@ -112,12 +143,17 @@ class IdleWorkloadProfile(MLWorkloadProfile):
     Минимальная нагрузка с редкими всплесками
     """
     
-    def get_workload(self) -> float:
+    def get_workload(self, gpu_id: int = 0) -> float:
         """Возвращает минимальную нагрузку"""
         # 95% времени - простой, 5% - небольшая активность
+        # Используем gpu_id для уникальности
+        random.seed(int(time.time() * 10) + gpu_id)
         if random.random() < 0.05:
-            return random.uniform(0.2, 0.4)
-        return random.uniform(0.0, 0.1)
+            load = random.uniform(0.2, 0.4)
+        else:
+            load = random.uniform(0.0, 0.1)
+        random.seed()
+        return load
 
 
 class WorkloadOrchestrator:
@@ -175,11 +211,11 @@ class WorkloadOrchestrator:
         # Ищем, к какой группе принадлежит GPU
         for group_name, group_data in self.groups.items():
             if gpu_id in group_data['gpus']:
-                return group_data['profile'].get_workload()
+                return group_data['profile'].get_workload(gpu_id)
         
         # Если GPU не в группе, используем idle профиль
         idle_profile = IdleWorkloadProfile(self.config)
-        return idle_profile.get_workload()
+        return idle_profile.get_workload(gpu_id)
     
     def should_update_workload(self) -> bool:
         """
