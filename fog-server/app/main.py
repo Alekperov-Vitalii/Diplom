@@ -68,6 +68,15 @@ class SensorData(BaseModel):
     gpu_temps: List[GPUTemperature]
     room_temp: float
 
+class EnvironmentalSensorData(BaseModel):
+    humidity: float = Field(..., ge=0, le=100)
+    dust_level: float = Field(..., ge=0)
+    
+class EnvironmentalActuatorData(BaseModel):
+    humidifier: bool = False
+    dehumidifier: bool = False
+    air_purifier: bool = False
+
 class FanData(BaseModel):
     fan_states: List[FanState]
 
@@ -76,6 +85,18 @@ class TelemetryPayload(BaseModel):
     timestamp: str
     sensors: SensorData
     fans: FanData
+
+class EnvironmentalPayload(BaseModel):
+    device_id: str
+    timestamp: str
+    sensors: EnvironmentalSensorData
+    actuators: EnvironmentalActuatorData
+
+class EnvironmentalControlCommand(BaseModel):
+    device_id: str
+    humidifier: Optional[bool] = None
+    dehumidifier: Optional[bool] = None
+    air_purifier: Optional[bool] = None
 
 class FanControlCommand(BaseModel):
     fan_id: int
@@ -212,6 +233,32 @@ class InfluxDBManager:
             .time(alert.timestamp)
         
         self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=point)
+
+    def write_environment_telemetry(self, payload: EnvironmentalPayload):
+        """
+        Сохранение телеметрии среды в InfluxDB
+        Measurement: environment
+        """
+        points = []
+        
+        # 1. Sensors
+        point_sensors = Point("environment") \
+            .tag("device_id", payload.device_id) \
+            .field("humidity", payload.sensors.humidity) \
+            .field("dust_level", payload.sensors.dust_level) \
+            .time(payload.timestamp)
+        points.append(point_sensors)
+        
+        # 2. Actuators (записываем как поля 0/1)
+        point_actuators = Point("env_actuators") \
+            .tag("device_id", payload.device_id) \
+            .field("humidifier", 1 if payload.actuators.humidifier else 0) \
+            .field("dehumidifier", 1 if payload.actuators.dehumidifier else 0) \
+            .field("air_purifier", 1 if payload.actuators.air_purifier else 0) \
+            .time(payload.timestamp)
+        points.append(point_actuators)
+        
+        self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=points)
     
     def query_latest_state(self) -> Dict[int, Dict[str, float]]:
         """
@@ -243,6 +290,51 @@ class InfluxDBManager:
                 gpu_stats[gpu_id][field] = value
         
         return gpu_stats
+
+    def query_latest_environment(self) -> Dict[str, Any]:
+        """
+        Получает последние данные среды и статус актуаторов
+        """
+        # 1. Sensors
+        query_env = f'''
+        from(bucket: "{config.INFLUXDB_BUCKET}")
+          |> range(start: -5m)
+          |> filter(fn: (r) => r["_measurement"] == "environment")
+          |> last()
+        '''
+        
+        # 2. Actuators
+        query_acts = f'''
+        from(bucket: "{config.INFLUXDB_BUCKET}")
+          |> range(start: -5m)
+          |> filter(fn: (r) => r["_measurement"] == "env_actuators")
+          |> last()
+        '''
+        
+        env_data = {"humidity": 0.0, "dust_level": 0.0}
+        act_data = {"humidifier": False, "dehumidifier": False, "air_purifier": False}
+        
+        try:
+            # Execute ENV query
+            result_env = self.query_api.query(query=query_env)
+            for table in result_env:
+                for record in table.records:
+                    field = record.values.get("_field")
+                    value = record.values.get("_value")
+                    env_data[field] = value
+            
+            # Execute ACTUATORS query
+            result_acts = self.query_api.query(query=query_acts)
+            for table in result_acts:
+                for record in table.records:
+                    field = record.values.get("_field")
+                    value = record.values.get("_value")
+                    act_data[field] = bool(value)
+                    
+        except Exception as e:
+            print(f"Error querying environment: {e}")
+            
+        return {**env_data, **act_data}
     
     def query_history(self, hours: int = 1) -> List[Dict[str, Any]]:
         """
@@ -273,6 +365,61 @@ class InfluxDBManager:
         return data
 
 influx_manager = InfluxDBManager()
+
+
+# ============================================================================
+# АЛГОРИТМ УПРАВЛЕНИЯ СРЕДОЙ (НОВЫЙ)
+# ============================================================================
+
+class EnvironmentalControlAlgorithm:
+    """
+    Алгоритм управления климатом (Влажность и Пыль)
+    """
+    
+    def calculate_commands(self, payload: EnvironmentalPayload) -> EnvironmentalControlCommand:
+        """
+        Принимает телеметрию, возвращает команды управления
+        """
+        humidity = payload.sensors.humidity
+        dust = payload.sensors.dust_level
+        
+        cmd = EnvironmentalControlCommand(device_id=payload.device_id)
+        
+        # 1. Логика Влажности
+        if humidity < 30.0:
+            # Слишком сухо -> Включить увлажнитель, выключить осушитель
+            if not payload.actuators.humidifier:
+                print(f"⚠️ Влажность {humidity:.1f}% < 30% -> Включаем увлажнитель")
+                cmd.humidifier = True
+                cmd.dehumidifier = False
+        elif humidity > 60.0:
+            # Слишком влажно -> Включить осушитель, выключить увлажнитель
+            if not payload.actuators.dehumidifier:
+                print(f"⚠️ Влажность {humidity:.1f}% > 60% -> Включаем осушитель")
+                cmd.dehumidifier = True
+                cmd.humidifier = False
+        else:
+            # Норма (30-60%) -> Выключаем всё
+            if payload.actuators.humidifier or payload.actuators.dehumidifier:
+                print(f"✅ Влажность {humidity:.1f}% в норме -> Выключаем климат-контроль")
+                cmd.humidifier = False
+                cmd.dehumidifier = False
+                
+        # 2. Логика Пыли
+        if dust > 50.0:
+            # Грязно -> Включить очиститель
+            if not payload.actuators.air_purifier:
+                print(f"⚠️ Пыль {dust:.0f} ug/m3 > 50 -> Включаем очиститель")
+                cmd.air_purifier = True
+        elif dust < 20.0:
+            # Чисто -> Выключить
+            if payload.actuators.air_purifier:
+                print(f"✅ Пыль {dust:.0f} ug/m3 < 20 -> Выключаем очиститель")
+                cmd.air_purifier = False
+                
+        return cmd
+
+env_algo = EnvironmentalControlAlgorithm()
 
 # ============================================================================
 # АЛГОРИТМ УПРАВЛЕНИЯ ОХЛАЖДЕНИЕМ
@@ -541,61 +688,81 @@ async def health_check():
     return {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
 
 @app.post("/api/v1/telemetry")
-async def receive_telemetry(payload: TelemetryPayload):
+async def receive_telemetry(payload: Dict[str, Any]):
     """
-    Приём телеметрии от ESP32
-    
-    Действия:
-    1. Сохранение в InfluxDB
-    2. Проверка на алерты
-    3. Вычисление команд управления (если режим AUTO)
-    4. Сохранение команд для ESP32
+    Универсальный приемник телеметрии
+    Принимает TelemetryPayload или EnvironmentalPayload
     """
     try:
-        # 1. Сохраняем в InfluxDB
-        influx_manager.write_telemetry(payload)
+        # Определяем тип payload по наличию полей
+        is_environment = "humidity" in str(payload)
         
-        # 2. Проверяем алерты
-        new_alerts = alert_manager.check_temperatures(payload)
-        for alert in new_alerts:
-            influx_manager.write_alert(alert)
-        
-        # 3. Вычисляем команды в зависимости от режима
-        global pending_commands
-        
-        if system_mode["mode"] == "auto":
-            # АВТОМАТИЧЕСКИЙ РЕЖИМ: алгоритм управляет
-            fan_commands = cooling_algo.calculate_fan_commands(payload)
-            pending_commands[payload.device_id] = fan_commands
+        if is_environment:
+            # === ОБРАБОТКА СРЕДЫ ===
+            env_payload = EnvironmentalPayload(**payload)
             
-        elif system_mode["mode"] == "manual":
-            # РУЧНОЙ РЕЖИМ: используем команды пользователя
-            if payload.device_id in system_mode["manual_commands"]:
-                manual_batch = system_mode["manual_commands"][payload.device_id]
-                fan_commands = FanControlBatch(
-                    device_id=payload.device_id,
-                    commands=[
-                        FanControlCommand(fan_id=cmd.fan_id, pwm_duty=cmd.pwm_duty)
-                        for cmd in manual_batch.commands
-                    ]
-                )
-                pending_commands[payload.device_id] = fan_commands
-        
-        print(f"✓ Телеметрия получена от {payload.device_id} (режим: {system_mode['mode']})")
-        
-        return {
-            "status": "success",
-            "message": "Telemetry received",
-            "alerts": len(new_alerts),
-            "mode": system_mode["mode"]
-        }
-    
+            # 1. Сохраняем в InfluxDB
+            influx_manager.write_environment_telemetry(env_payload)
+            
+            # 2. Логика управления
+            global pending_env_commands
+            if system_mode["mode"] == "auto":
+                cmd = env_algo.calculate_commands(env_payload)
+                pending_env_commands[env_payload.device_id] = cmd
+                
+            print(f"🌍 Телеметрия среды от {env_payload.device_id}: Hum={env_payload.sensors.humidity:.1f}%, Dust={env_payload.sensors.dust_level:.0f}")
+            
+            return {"status": "success", "type": "environment"}
+            
+        else:
+            # === ОБРАБОТКА GPU (Стандартная) ===
+            gpu_payload = TelemetryPayload(**payload)
+            
+            # 1. Сохраняем в InfluxDB
+            influx_manager.write_telemetry(gpu_payload)
+            
+            # 2. Проверяем алерты
+            new_alerts = alert_manager.check_temperatures(gpu_payload)
+            for alert in new_alerts:
+                influx_manager.write_alert(alert)
+            
+            # 3. Вычисляем команды
+            global pending_commands
+            
+            if system_mode["mode"] == "auto":
+                fan_commands = cooling_algo.calculate_fan_commands(gpu_payload)
+                pending_commands[gpu_payload.device_id] = fan_commands
+                
+            elif system_mode["mode"] == "manual":
+                if gpu_payload.device_id in system_mode["manual_commands"]:
+                    manual_batch = system_mode["manual_commands"][gpu_payload.device_id]
+                    fan_commands = FanControlBatch(
+                        device_id=gpu_payload.device_id,
+                        commands=[
+                            FanControlCommand(fan_id=cmd.fan_id, pwm_duty=cmd.pwm_duty)
+                            for cmd in manual_batch.commands
+                        ]
+                    )
+                    pending_commands[gpu_payload.device_id] = fan_commands
+            
+            print(f"✓ Телеметрия GPU от {gpu_payload.device_id}")
+            
+            return {
+                "status": "success", 
+                "message": "Telemetry received",
+                "alerts": len(new_alerts),
+                "mode": system_mode["mode"]
+            }
+
     except Exception as e:
         print(f"✗ Ошибка обработки телеметрии: {e}")
+        # import traceback
+        # traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
-# Хранилище команд для ESP32
+# Хранилище команд
 pending_commands: Dict[str, FanControlBatch] = {}
+pending_env_commands: Dict[str, EnvironmentalControlCommand] = {}
 
 # ============================================================================
 # УПРАВЛЕНИЕ РЕЖИМОМ РАБОТЫ
@@ -631,22 +798,30 @@ def log_user_action(action: str, details: dict):
 async def get_fan_commands(device_id: str):
     """
     ESP32 получает команды управления вентиляторами
-    
-    Returns:
-        FanControlBatch если есть команды
-        204 No Content если команд нет
     """
     if device_id in pending_commands:
-        commands = pending_commands.pop(device_id)  # Забираем и удаляем
+        commands = pending_commands.pop(device_id)
         return commands
     else:
-        return None  # FastAPI вернёт 204
+        return None
+
+@app.get("/api/v1/env-control/{device_id}")
+async def get_env_commands(device_id: str):
+    """
+    ESP32 (Env Monitor) получает команды управления реле
+    """
+    if device_id in pending_env_commands:
+        commands = pending_env_commands.pop(device_id)
+        return commands
+    else:
+        return None
 
 @app.get("/api/v1/current-state")
 async def get_current_state():
     """API для веб-интерфейса: текущее состояние системы"""
     try:
         gpu_stats = influx_manager.query_latest_state()
+        env_stats = influx_manager.query_latest_environment()
         
         return {
             "gpu_temps": [
@@ -658,6 +833,7 @@ async def get_current_state():
                 for k, v in gpu_stats.items()
             ],
             "alerts": list(alert_manager.active_alerts.values()),
+            "environment": env_stats,
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:

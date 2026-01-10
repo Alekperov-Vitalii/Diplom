@@ -202,6 +202,71 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Environment Status (NEW) */}
+        {state?.environment && (
+          <div className="mb-8">
+            <h2 className="text-2xl font-bold mb-4">🌍 Стан навколишнього середовища</h2>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              
+              {/* Humidity Card */}
+              <div className={`rounded-lg shadow p-6 border-l-4 ${
+                state.environment.humidity < 30 ? 'bg-red-50 border-red-500' :
+                state.environment.humidity > 60 ? 'bg-yellow-50 border-yellow-500' :
+                'bg-white border-green-500'
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">💧 Вологість</h3>
+                  <div className="flex space-x-2">
+                    {state.environment.humidifier && (
+                      <span className="px-2 py-1 bg-blue-500 text-white text-xs rounded animate-pulse">
+                        Зволожувач ВКЛ
+                      </span>
+                    )}
+                    {state.environment.dehumidifier && (
+                      <span className="px-2 py-1 bg-orange-500 text-white text-xs rounded animate-pulse">
+                        Осушувач ВКЛ
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-4xl font-bold mb-2">
+                  {state.environment.humidity.toFixed(1)}%
+                </div>
+                <div className="text-sm text-gray-600">
+                  {state.environment.humidity < 30 ? 'Занадто сухо! Ризик статики.' :
+                   state.environment.humidity > 60 ? 'Занадто волого! Ризик корозії.' :
+                   'Нормальний рівень'}
+                </div>
+              </div>
+
+              {/* Dust Card */}
+              <div className={`rounded-lg shadow p-6 border-l-4 ${
+                state.environment.dust_level > 50 ? 'bg-red-50 border-red-500' :
+                'bg-white border-green-500'
+              }`}>
+                <div className="flex items-center justify-between mb-4">
+                  <h3 className="text-lg font-bold">🌫️ Рівень пилу</h3>
+                  <div>
+                    {state.environment.air_purifier && (
+                      <span className="px-2 py-1 bg-green-600 text-white text-xs rounded animate-pulse">
+                        Очищувач ВКЛ
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="text-4xl font-bold mb-2">
+                  {state.environment.dust_level.toFixed(0)} <span className="text-lg text-gray-500">мкг/м³</span>
+                </div>
+                <div className="text-sm text-gray-600">
+                   {state.environment.dust_level > 50 ? 'Високий рівень пилу! Потрібна очистка.' :
+                    'Повітря чисте.'}
+                </div>
+              </div>
+
+            </div>
+          </div>
+        )}
+
         {/* Navigation */}
         <div className="flex space-x-4">
           <a

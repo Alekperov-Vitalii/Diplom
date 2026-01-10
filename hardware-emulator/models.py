@@ -4,7 +4,7 @@ Pydantic модели для валидации и сериализации JSON
 """
 
 from pydantic import BaseModel, Field
-from typing import List
+from typing import List, Optional
 from datetime import datetime
 
 
@@ -41,14 +41,33 @@ class FanState(BaseModel):
 
 
 class SensorData(BaseModel):
-    """Данные со всех датчиков"""
-    gpu_temps: List[GPUTemperature] = Field(..., description="Температуры всех GPU")
-    room_temp: float = Field(..., ge=-10, le=60, description="Температура помещения")
+    gpu_temps: List[GPUTemperature]
+    room_temp: float
 
+class EnvironmentalSensorData(BaseModel):
+    humidity: float = Field(..., ge=0, le=100)
+    dust_level: float = Field(..., ge=0)
+    
+class EnvironmentalActuatorData(BaseModel):
+    humidifier: bool = False
+    dehumidifier: bool = False
+    air_purifier: bool = False
 
 class FanData(BaseModel):
     """Данные всех вентиляторов"""
     fan_states: List[FanState] = Field(..., description="Состояния всех вентиляторов")
+
+class EnvironmentalPayload(BaseModel):
+    device_id: str
+    timestamp: str
+    sensors: EnvironmentalSensorData
+    actuators: EnvironmentalActuatorData
+
+class EnvironmentalControlCommand(BaseModel):
+    device_id: str
+    humidifier: Optional[bool] = None
+    dehumidifier: Optional[bool] = None
+    air_purifier: Optional[bool] = None
 
 
 class TelemetryPayload(BaseModel):

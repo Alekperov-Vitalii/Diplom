@@ -19,9 +19,24 @@ export interface Alert {
 }
 
 export interface CurrentState {
-  gpu_temps: GPUTemp[];
+  gpu_temps: GPUTemperature[];
   alerts: Alert[];
+  environment?: EnvironmentState;
   timestamp: string;
+}
+
+export interface EnvironmentState {
+  humidity: number;
+  dust_level: number;
+  humidifier: boolean;
+  dehumidifier: boolean;
+  air_purifier: boolean;
+}
+
+export interface GPUTemperature {
+  gpu_id: number;
+  temperature: number;
+  load: number;
 }
 
 export interface HistoryDataPoint {

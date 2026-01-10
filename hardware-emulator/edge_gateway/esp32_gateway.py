@@ -103,6 +103,15 @@ class ESP32Gateway:
             self.logger.info(f"📥 ESP32 Gateway: Получены команды ({len(commands.commands)} вентиляторов)")
         
         return commands
+
+    def receive_env_commands(self):
+        """
+        Получает команды управления средой (Env Monitor)
+        """
+        commands = self.api_client.fetch_env_commands(self.device_id)
+        if commands:
+             self.logger.info(f"📥 ESP32 Gateway: Получены команды управления средой")
+        return commands
     
     def health_check(self) -> bool:
         """

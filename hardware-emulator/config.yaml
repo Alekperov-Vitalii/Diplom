@@ -10,11 +10,42 @@ fog_server:
 device:
   id: "esp32_master_001" # Уникальный идентификатор этого ESP32
   gpu_count: 16 # Количество видеокарт (расширено с 8 до 16)
+# Secondary Device: Environment Monitor
+secondary_device:
+  id: "esp32_env_001"
+  enabled: true
+
+# Environment Profiles
+environment_profiles:
+  enabled: true
+  current_profile: "dusty_workshop" # standard_office, dusty_workshop, clean_room, dry_static
+  profiles:
+    standard_office:
+      target_humidity: 45.0
+      target_dust: 10.0
+      ventilation_rate: 0.5
+    dusty_workshop:
+      target_humidity: 60.0
+      target_dust: 150.0
+      ventilation_rate: 0.8
+    clean_room:
+      target_humidity: 40.0
+      target_dust: 0.0
+      ventilation_rate: 1.0 # MAX HEPA FILTRATION
+    dry_static:
+      target_humidity: 20.0 # DANGER
+      target_dust: 5.0
+      ventilation_rate: 0.3
+
+# Sensors Configuration
+sensors:
+  sensor_read_interval: 5 # Как часто читаем датчики (5 сек)
+  data_send_interval: 30 # Как часто отправляем данные (30 сек)
 
 # Timing Settings (в секундах)
 timing:
-  sensor_read_interval: 5 # Как часто читаем датчики (5 сек)
-  data_send_interval: 30 # Как часто отправляем данные (30 сек)
+  sensor_read_interval: 5
+  data_send_interval: 30
 
 # Temperature Simulation Parameters
 simulation:

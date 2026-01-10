@@ -96,13 +96,16 @@ class FogServerClient:
             response = self.session.get(endpoint, timeout=self.timeout)
             
             if response.status_code == 204:
-                # 204 No Content = команд нет
                 return None
             
             response.raise_for_status()
             
+            data = response.json()
+            if not data:
+                return None
+                
             # Парсим JSON в Pydantic модель
-            commands = FanControlBatch(**response.json())
+            commands = FanControlBatch(**data)
             logger.info(f"✓ Получены команды для {len(commands.commands)} вентиляторов")
             return commands
             
@@ -112,6 +115,33 @@ class FogServerClient:
             
         except Exception as e:
             logger.warning(f"Ошибка получения команд: {e}")
+            return None
+
+    def fetch_env_commands(self, device_id: str):
+        """
+        Получает команды управления средой (Env Monitor)
+        """
+        endpoint = f"{self.base_url}/api/v1/env-control/{device_id}"
+        
+        try:
+            response = self.session.get(endpoint, timeout=self.timeout)
+            
+            if response.status_code == 204: 
+                return None
+                
+            response.raise_for_status()
+            
+            data = response.json()
+            if not data: 
+                return None
+                
+            from models import EnvironmentalControlCommand
+            commands = EnvironmentalControlCommand(**data)
+            logger.info(f"✓ Получены команды управления средой")
+            return commands
+            
+        except Exception as e:
+            logger.warning(f"Ошибка получения команд среды: {e}")
             return None
     
     def health_check(self) -> bool:
