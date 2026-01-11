@@ -4,6 +4,7 @@ Simulates particulate matter (PM) concentration with accumulation behavior
 """
 
 import random
+import logging
 from typing import Optional
 from sensors.base_sensor import BaseSensor
 
@@ -41,6 +42,7 @@ class DustSensor(BaseSensor):
         self.equilibrium_dust = equilibrium_dust
         self.base_rate = base_rate
         self.noise_amplitude = noise_amplitude
+        self.logger = logging.getLogger(__name__)
         
         # Fan influence factor
         self.fan_influence = 1.0  # Multiplier when fans at high RPM

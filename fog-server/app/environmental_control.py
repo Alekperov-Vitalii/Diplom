@@ -42,6 +42,11 @@ class EnvironmentalControlAlgorithm:
         self.humidifier_active = False
         self.humidifier_power = 0
         
+        # Current environmental state (for cooling modifier)
+        self.current_humidity = 50.0  # Default optimal
+        self.current_dust = 0.0       # Default clean
+
+        
         # Timing tracking
         self.last_activation_time: Dict[str, float] = {}
         self.humidity_out_of_range_since: Optional[float] = None
@@ -50,6 +55,12 @@ class EnvironmentalControlAlgorithm:
         self.active_environmental_alerts: List[Dict] = []
         
         print("✓ Environmental Control Algorithm initialized")
+        
+    def update_current_state(self, humidity: float, dust: float):
+        """Update current environmental state"""
+        self.current_humidity = humidity
+        self.current_dust = dust
+
     
     def calculate_control_commands(
         self, 
@@ -69,10 +80,9 @@ class EnvironmentalControlAlgorithm:
         current_time = time.time()
         
         # Reset control commands
+        # Reset control commands
         commands = {
-            '
-
-dehumidifier_active': False,
+            'dehumidifier_active': False,
             'dehumidifier_power': 0,
             'humidifier_active': False,
             'humidifier_power': 0

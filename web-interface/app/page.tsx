@@ -1,14 +1,16 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getCurrentState, CurrentState, healthCheck, getFanStatistics, FanStatistics, getSystemMode, SystemMode } from '@/lib/api';
-import { Thermometer, Fan, AlertTriangle, Activity, Settings } from 'lucide-react';
+import { getCurrentState, CurrentState, healthCheck, getFanStatistics, FanStatistics, getSystemMode, SystemMode, getEnvironmentalState, EnvironmentalState } from '@/lib/api';
+import Link from 'next/link';
+import { Thermometer, Fan, AlertTriangle, Activity, Settings, Droplets, History, TrendingUp, Sliders } from 'lucide-react';
 import FanCard from '@/components/FanCard';
 
 export default function Dashboard() {
   const [state, setState] = useState<CurrentState | null>(null);
   const [fanStats, setFanStats] = useState<FanStatistics[]>([]);
   const [systemMode, setSystemMode] = useState<SystemMode | null>(null);
+  const [envState, setEnvState] = useState<EnvironmentalState | null>(null);
   const [serverOnline, setServerOnline] = useState(true);
   const [loading, setLoading] = useState(true);
 
@@ -20,14 +22,16 @@ export default function Dashboard() {
         setServerOnline(online);
         
         if (online) {
-          const [data, stats, mode] = await Promise.all([
+          const [data, stats, mode, envData] = await Promise.all([
             getCurrentState(),
             getFanStatistics(),
-            getSystemMode()
+            getSystemMode(),
+            getEnvironmentalState()
           ]);
           setState(data);
           setFanStats(stats);
           setSystemMode(mode);
+          setEnvState(envData);
         }
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -105,6 +109,39 @@ export default function Dashboard() {
           </div>
         </div>
 
+        {/* Navigation Buttons */}
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+          <Link href="/history" className="flex items-center justify-center p-4 bg-white rounded-lg shadow border-2 border-transparent hover:border-blue-500 hover:shadow-md transition-all group">
+            <div className="bg-blue-100 p-3 rounded-full mr-4 group-hover:bg-blue-200 transition-colors">
+              <History className="w-6 h-6 text-blue-600" />
+            </div>
+            <div className="text-left">
+              <div className="font-bold text-lg text-gray-900">Історія</div>
+              <div className="text-sm text-gray-500">Графіки та статистика</div>
+            </div>
+          </Link>
+          
+          <Link href="/trends" className="flex items-center justify-center p-4 bg-white rounded-lg shadow border-2 border-transparent hover:border-purple-500 hover:shadow-md transition-all group">
+            <div className="bg-purple-100 p-3 rounded-full mr-4 group-hover:bg-purple-200 transition-colors">
+              <TrendingUp className="w-6 h-6 text-purple-600" />
+            </div>
+            <div className="text-left">
+              <div className="font-bold text-lg text-gray-900">Тренди</div>
+              <div className="text-sm text-gray-500">Аналіз ефективності</div>
+            </div>
+          </Link>
+          
+          <Link href="/control" className="flex items-center justify-center p-4 bg-white rounded-lg shadow border-2 border-transparent hover:border-green-500 hover:shadow-md transition-all group">
+            <div className="bg-green-100 p-3 rounded-full mr-4 group-hover:bg-green-200 transition-colors">
+              <Sliders className="w-6 h-6 text-green-600" />
+            </div>
+            <div className="text-left">
+              <div className="font-bold text-lg text-gray-900">Керування</div>
+              <div className="text-sm text-gray-500">Вентилятори та середовище</div>
+            </div>
+          </Link>
+        </div>
+
         {/* Alerts */}
         {(criticalAlerts.length > 0 || warningAlerts.length > 0) && (
           <div className="mb-6 space-y-2">
@@ -130,6 +167,89 @@ export default function Dashboard() {
             ))}
           </div>
         )}
+
+        {/* Environmental Status */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-2xl font-bold mb-4 flex items-center">
+            <Droplets className="w-6 h-6 mr-2" />
+            Параметри навколишнього середовища
+          </h2>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {/* Humidity Card */}
+            <div className={`p-4 rounded-lg border-l-4 ${
+              envState?.humidity && envState.humidity >= 40 && envState.humidity <= 60 
+                ? 'border-green-500 bg-green-50' 
+                : envState?.humidity && (envState.humidity < 30 || envState.humidity > 70)
+                ? 'border-red-500 bg-red-50'
+                : 'border-yellow-500 bg-yellow-50'
+            }`}>
+              <div className="text-sm text-gray-600 mb-1">Вологість</div>
+              <div className="text-3xl font-bold">
+                {envState?.humidity?.toFixed(1) ?? '--'}%
+              </div>
+              <div className="text-xs mt-2">
+                {envState?.humidity && envState.humidity >= 40 && envState.humidity <= 60 
+                  ? '✓ Оптимально' 
+                  : envState?.humidity && envState.humidity < 40 
+                  ? '⚠ Низька - ризик статики'
+                  : '⚠ Висока - ризик корозії'}
+              </div>
+            </div>
+            
+            {/* Dust Card */}
+            <div className={`p-4 rounded-lg border-l-4 ${
+              envState?.dust && envState.dust < 25 
+                ? 'border-green-500 bg-green-50' 
+                : envState?.dust && envState.dust < 50
+                ? 'border-yellow-500 bg-yellow-50'
+                : 'border-red-500 bg-red-50'
+            }`}>
+              <div className="text-sm text-gray-600 mb-1">Рівень пилу</div>
+              <div className="text-3xl font-bold">
+                {envState?.dust?.toFixed(1) ?? '--'} μg/m³
+              </div>
+              <div className="text-xs mt-2">
+                {envState?.dust && envState.dust < 25 
+                  ? '✓ Низький' 
+                  : envState?.dust && envState.dust < 50 
+                  ? '⚠ Помірний'
+                  : '🚨 Високий - потрібне очищення'}
+              </div>
+            </div>
+            
+            {/* Actuators Status */}
+            <div className="p-4 rounded-lg border-l-4 border-blue-500 bg-blue-50">
+              <div className="text-sm text-gray-600 mb-1">Активні засоби контролю</div>
+              {envState?.actuators.dehumidifier_active && (
+                <div className="text-sm mt-2">
+                  🌬️ Осушувач: {envState.actuators.dehumidifier_power}%
+                </div>
+              )}
+              {envState?.actuators.humidifier_active && (
+                <div className="text-sm mt-2">
+                  💧 Зволожувач: {envState.actuators.humidifier_power}%
+                </div>
+              )}
+              {!envState?.actuators.dehumidifier_active && !envState?.actuators.humidifier_active && (
+                <div className="text-sm mt-2 text-gray-500">— Немає активних засобів</div>
+              )}
+            </div>
+          </div>
+          
+          {/* Environmental Alerts */}
+          {envState?.alerts && envState.alerts.length > 0 && (
+            <div className="mt-4 space-y-2">
+              {envState.alerts.map((alert, idx) => (
+                <div key={idx} className={`p-3 rounded-lg ${
+                  alert.severity === 'critical' ? 'bg-red-100 text-red-800' : 'bg-yellow-100 text-yellow-800'
+                }`}>
+                  <div className="font-medium">{alert.message}</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
 
         {/* GPU Cards */}
         <div className="mb-8">

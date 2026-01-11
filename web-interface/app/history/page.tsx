@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getHistory, HistoryDataPoint, getFanHistory, FanHistoryDataPoint } from '@/lib/api';
+import { getHistory, HistoryDataPoint, getFanHistory, FanHistoryDataPoint, getEnvironmentalHistory, EnvironmentalHistoryPoint } from '@/lib/api';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
-import { ArrowLeft, Thermometer, Fan } from 'lucide-react';
+import { ArrowLeft, Thermometer, Fan, Droplets } from 'lucide-react';
 
 interface ChartDataPoint {
   time: string;
@@ -15,6 +15,8 @@ export default function History() {
   const [tempData, setTempData] = useState<ChartDataPoint[]>([]);
   const [fanPWMData, setFanPWMData] = useState<ChartDataPoint[]>([]);
   const [fanRPMData, setFanRPMData] = useState<ChartDataPoint[]>([]);
+  const [humidityData, setHumidityData] = useState<ChartDataPoint[]>([]);
+  const [dustData, setDustData] = useState<ChartDataPoint[]>([]);
   const [loading, setLoading] = useState(true);
   const [hours, setHours] = useState(1);
   const [activeChart, setActiveChart] = useState<'pwm' | 'rpm'>('pwm');
@@ -90,6 +92,49 @@ export default function History() {
           }, {});
         
         setFanRPMData(Object.values(rpmGrouped));
+        
+        // Завантажуємо environmental дані
+        const envHistory = await getEnvironmentalHistory(hours);
+        
+        // Групуємо humidity за часом
+        const humidityGrouped = envHistory
+          .filter(p => p.field === 'humidity')
+          .reduce((acc: Record<string, ChartDataPoint>, point: EnvironmentalHistoryPoint) => {
+            const time = new Date(point.time).toLocaleTimeString('uk-UA', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            
+            if (!acc[time]) {
+              acc[time] = { time };
+            }
+            
+            acc[time]['Вологість'] = point.value;
+            
+            return acc;
+          }, {});
+        
+        setHumidityData(Object.values(humidityGrouped));
+        
+        // Групуємо dust за часом
+        const dustGrouped = envHistory
+          .filter(p => p.field === 'dust')
+          .reduce((acc: Record<string, ChartDataPoint>, point: EnvironmentalHistoryPoint) => {
+            const time = new Date(point.time).toLocaleTimeString('uk-UA', { 
+              hour: '2-digit', 
+              minute: '2-digit' 
+            });
+            
+            if (!acc[time]) {
+              acc[time] = { time };
+            }
+            
+            acc[time]['Пил'] = point.value;
+            
+            return acc;
+          }, {});
+        
+        setDustData(Object.values(dustGrouped));
         
       } catch (error) {
         console.error('Error fetching history:', error);
@@ -351,6 +396,89 @@ export default function History() {
               </div>
             </>
           )}
+        </div>
+
+        {/* Environmental Parameters History */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <div className="flex items-center space-x-2 mb-4">
+            <Droplets className="w-6 h-6 text-blue-500" />
+            <h2 className="text-xl font-bold">Історія параметрів навколишнього середовища</h2>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Humidity Graph */}
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Вологість (%)</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={humidityData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="time" 
+                    tick={{ fontSize: 12 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    label={{ value: 'Вологість (%)', angle: -90, position: 'insideLeft' }}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #ccc' }}
+                    labelStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: number) => `${Number(value).toFixed(1)}%`}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="Вологість" 
+                    stroke="#3b82f6" 
+                    strokeWidth={3}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-2 text-sm text-gray-600">
+                <p>• Оптимальний діапазон: 40-60%</p>
+                <p>• Зелена зона: безпечна вологість</p>
+              </div>
+            </div>
+            
+            {/* Dust Graph */}
+            <div>
+              <h3 className="text-lg font-semibold mb-2">Концентрація пилу (μg/m³)</h3>
+              <ResponsiveContainer width="100%" height={300}>
+                <LineChart data={dustData}>
+                  <CartesianGrid strokeDasharray="3 3" />
+                  <XAxis 
+                    dataKey="time" 
+                    tick={{ fontSize: 12 }}
+                    interval="preserveStartEnd"
+                  />
+                  <YAxis 
+                    label={{ value: 'Пил (μg/m³)', angle: -90, position: 'insideLeft' }}
+                    domain={[0, 100]}
+                  />
+                  <Tooltip 
+                    contentStyle={{ backgroundColor: 'rgba(255, 255, 255, 0.95)', border: '1px solid #ccc' }}
+                    labelStyle={{ fontWeight: 'bold' }}
+                    formatter={(value: number) => `${Number(value).toFixed(1)} μg/m³`}
+                  />
+                  <Legend />
+                  <Line 
+                    type="monotone" 
+                    dataKey="Пил" 
+                    stroke="#ef4444" 
+                    strokeWidth={3}
+                    dot={false}
+                  />
+                </LineChart>
+              </ResponsiveContainer>
+              <div className="mt-2 text-sm text-gray-600">
+                <p>• Низький: &lt;25 μg/m³</p>
+                <p>• Помірний: 25-50 μg/m³</p>
+                <p>• Високий: &gt;50 μg/m³ (потрібне очищення)</p>
+              </div>
+            </div>
+          </div>
         </div>
 
         {/* Аналітика */}

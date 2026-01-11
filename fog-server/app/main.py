@@ -493,6 +493,31 @@ class SmartCoolingAlgorithm:
         elif load > 50:
             target = max(target, 40)
             
+        # -------------------------------------------------------------------------
+        # КОРРЕКЦИЯ ПО ОКРУЖАЮЩЕЙ СРЕДЕ (Environmental Modifier)
+        # -------------------------------------------------------------------------
+        # Получаем модификатор эффективности охлаждения
+        # Если воздух влажный/пыльный, эффективность падает (< 1.0)
+        # Нам нужно УВЕЛИЧИТЬ PWM, чтобы компенсировать это
+        try:
+            # Получаем последние известные данные
+            from environmental_control import environmental_control_algo
+            efficiency = environmental_control_algo.get_cooling_efficiency_modifier(
+                environmental_control_algo.current_humidity,
+                environmental_control_algo.current_dust
+            )
+            
+            # Если эффективность < 1, нужно увеличить PWM
+            # target_new = target / efficiency
+            # Пример: efficiency 0.8 -> target 50 становится 62.5
+            if efficiency < 0.99 and efficiency > 0.1: # Protect from div/0
+                target_compensated = target / efficiency
+                # print(f"  Environmental compensation: PWM {target:.0f} -> {target_compensated:.0f} (Eff: {efficiency:.2f})")
+                target = target_compensated
+        except Exception as e:
+            # Fallback if algo not ready
+            pass
+            
         return int(max(config.MIN_FAN_PWM, min(target, config.MAX_FAN_PWM)))
 
     def calculate_fan_commands(self, payload: TelemetryPayload) -> FanControlBatch:
@@ -990,6 +1015,241 @@ async def get_fan_statistics():
     
     except Exception as e:
         print(f"✗ Ошибка получения статистики: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+# ============================================================================
+# ENVIRONMENTAL API ENDPOINTS
+# ============================================================================
+
+# Storage for pending environmental commands
+pending_environmental_commands: Dict[str, Dict] = {}
+
+@app.post("/api/v1/environmental/telemetry")
+async def receive_environmental_telemetry(payload: EnvironmentalPayload):
+    """
+    Приём environmental telemetry от ESP32
+    
+    Действия:
+    1. Сохранение в InfluxDB
+    2. Проверка на environmental alerts
+    3. Вычисление команд управления (если режим AUTO)  
+    4. Добавление данных в trend analyzer
+    5. Применение cooling efficiency modifier
+    """
+    try:
+        # 1. Сохраняем в InfluxDB
+        influx_manager.write_environmental_telemetry(payload)
+        
+        # 2. Add to trend analyzer
+        import time
+        current_time = time.time()
+        trend_analyzer.add_data_point(
+            payload.sensors.humidity,
+            payload.sensors.dust,
+            current_time
+        )
+        
+        # Update current state in algo for cooling calculations
+        environmental_control_algo.update_current_state(
+            payload.sensors.humidity,
+            payload.sensors.dust
+        )
+        
+        # 3. Проверяем alerts
+        new_alerts = environmental_control_algo.check_environmental_alerts(
+            payload.sensors.humidity,
+            payload.sensors.dust,
+            payload.timestamp
+        )
+        for alert in new_alerts:
+            influx_manager.write_environmental_alert(alert)
+        
+        # 4. Вычисляем control commands (if auto mode)
+        global pending_environmental_commands
+        
+        if system_mode["mode"] == "auto":
+            control_commands = environmental_control_algo.calculate_control_commands(
+                payload.sensors.humidity,
+                payload.sensors.dust
+            )
+            pending_environmental_commands[payload.device_id] = control_commands
+        
+        print(f"✓ Environmental telemetry received from {payload.device_id}")
+        print(f"  Humidity: {payload.sensors.humidity:.1f}%, Dust: {payload.sensors.dust:.1f} μg/m³")
+        
+        return {
+            "status": "success",
+            "message": "Environmental telemetry received",
+            "alerts": len(new_alerts)
+        }
+    
+    except Exception as e:
+        print(f"✗ Error processing environmental telemetry: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/environmental/control/{device_id}")
+async def get_environmental_commands(device_id: str):
+    """
+    ESP32 получает environmental control commands
+    
+    Returns:
+        Dict with commands or 204 No Content
+    """
+    if device_id in pending_environmental_commands:
+        commands = pending_environmental_commands.pop(device_id)
+        return commands
+    else:
+        return None
+
+
+@app.get("/api/v1/environmental/current")
+async def get_current_environmental_state():
+    """
+    API для веб-интерфейса: текущее environmental состояние
+    """
+    try:
+        # Query latest environmental data
+        history = influx_manager.query_environmental_history(hours=1)
+        
+        # Extract latest values
+        latest_humidity = None
+        latest_dust = None
+        
+        for point in reversed(history):
+            if point["field"] == "humidity" and latest_humidity is None:
+                latest_humidity = point["value"]
+            if point["field"] == "dust" and latest_dust is None:
+                latest_dust = point["value"]
+            if latest_humidity is not None and latest_dust is not None:
+                break
+        
+        # Get current actuator states
+        actuator_states = {
+            "dehumidifier_active": environmental_control_algo.dehumidifier_active,
+            "dehumidifier_power": environmental_control_algo.dehumidifier_power,
+            "humidifier_active": environmental_control_algo.humidifier_active,
+            "humidifier_power": environmental_control_algo.humidifier_power
+        }
+        
+        return {
+            "humidity": latest_humidity,
+            "dust": latest_dust,
+            "actuators": actuator_states,
+            "alerts": environmental_control_algo.active_environmental_alerts,
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/environmental/history")
+async def get_environmental_history(hours: int = 1):
+    """
+    API для веб-интерфейса: environmental historical data
+    """
+    try:
+        data = influx_manager.query_environmental_history(hours)
+        return {"data": data}
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.get("/api/v1/environmental/trends")
+async def get_environmental_trends():
+    """
+    API для веб-интерфейса: computed environmental trends
+    """
+    try:
+        # Calculate trends
+        humidity_rate = trend_analyzer.calculate_hourly_humidity_change_rate()
+        dust_rate = trend_analyzer.calculate_hourly_dust_accumulation_rate()
+        
+        # Infer hidden factors
+        ventilation_level = trend_analyzer.infer_ventilation_level(humidity_rate)
+        filtration_quality = trend_analyzer.infer_filtration_quality(dust_rate)
+        
+        # Get latest environmental values for cooling efficiency
+        history = influx_manager.query_environmental_history(hours=1)
+        latest_humidity = 50.0
+        latest_dust = 25.0
+        
+        for point in reversed(history):
+            if point["field"] == "humidity":
+                latest_humidity = point["value"]
+                break
+        for point in reversed(history):
+            if point["field"] == "dust":
+                latest_dust = point["value"]
+                break
+        
+        cooling_efficiency = environmental_control_algo.get_cooling_efficiency_modifier(
+            latest_humidity,
+            latest_dust
+        )
+        
+        return {
+            "trends": {
+                "hourly_humidity_change_rate": {
+                    "value": humidity_rate,
+                    "interpretation": ventilation_level,
+                    "formula": "avg(current RH - previous RH) over last hour"
+                },
+                "hourly_dust_accumulation_rate": {
+                    "value": dust_rate,
+                    "interpretation": filtration_quality,
+                    "formula": "avg(current PM - previous PM) over last hour"
+                },
+                "cooling_efficiency_modifier": {
+                    "value": cooling_efficiency,
+                    "reduction_percent": (1.0 - cooling_efficiency) * 100,
+                    "formula": "1 - (0.002 * |RH - 50|) - (0.001 * PM)"
+                }
+            },
+            "timestamp": datetime.now(timezone.utc).isoformat()
+        }
+    
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=str(e))
+
+
+@app.post("/api/v1/environmental/control")
+async def set_environmental_control(command: EnvironmentalControlCommand):
+    """
+    Manual environmental control (user override)
+    """
+    try:
+        # Store manual command
+        device_id = "esp32_master_001"  # Default device
+        
+        commands = {
+            "dehumidifier_active": command.dehumidifier_active,
+            "dehumidifier_power": command.dehumidifier_power,
+            "humidifier_active": command.humidifier_active,
+            "humidifier_power": command.humidifier_power
+        }
+        
+        # Add to pending commands
+        global pending_environmental_commands
+        pending_environmental_commands[device_id] = commands
+        
+        # Log user action
+        log_user_action(
+            action="environmental_control",
+            details=commands
+        )
+        
+        print(f"🎛️ Manual environmental control applied: {commands}")
+        
+        return {
+            "status": "success",
+            "message": "Environmental control command sent",
+            "commands": commands
+        }
+    
+    except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
 

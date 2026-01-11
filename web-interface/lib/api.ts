@@ -179,3 +179,109 @@ export async function getFanHistory(hours: number = 1): Promise<FanHistoryDataPo
   const json = await response.json();
   return json.data;
 }
+
+// ============================================================================
+// ENVIRONMENTAL MONITORING INTERFACES & API
+// ============================================================================
+
+export interface EnvironmentalSensorData {
+  humidity: number;  // %
+  dust: number;      // μg/m³
+}
+
+export interface EnvironmentalActuatorData {
+  dehumidifier_active: boolean;
+  dehumidifier_power: number;
+  humidifier_active: boolean;
+  humidifier_power: number;
+}
+
+export interface EnvironmentalAlert {
+  alert_type: 'dust_high' | 'humidity_low' | 'humidity_high';
+  current_value: number;
+  threshold: number;
+  severity: 'warning' | 'critical';
+  timestamp: string;
+  message: string;
+}
+
+export interface EnvironmentalState {
+  humidity: number | null;
+  dust: number | null;
+  actuators: EnvironmentalActuatorData;
+  alerts: EnvironmentalAlert[];
+  timestamp: string;
+}
+
+export interface EnvironmentalHistoryPoint {
+  time: string;
+  field: 'humidity' | 'dust';
+  value: number;
+}
+
+export interface EnvironmentalTrends {
+  hourly_humidity_change_rate: {
+    value: number | null;
+    interpretation: string;
+    formula: string;
+  };
+  hourly_dust_accumulation_rate: {
+    value: number | null;
+    interpretation: string;
+    formula: string;
+  };
+  cooling_efficiency_modifier: {
+    value: number;
+    reduction_percent: number;
+    formula: string;
+  };
+}
+
+export interface EnvironmentalControlCommand {
+  dehumidifier_active: boolean;
+  dehumidifier_power: number;
+  humidifier_active: boolean;
+  humidifier_power: number;
+}
+
+/**
+ * Получает текущее состояние environmental параметров
+ */
+export async function getEnvironmentalState(): Promise<EnvironmentalState> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/environmental/current`);
+  if (!response.ok) throw new Error('Failed to fetch environmental state');
+  return response.json();
+}
+
+/**
+ * Получает историю environmental параметров за последние N часов
+ */
+export async function getEnvironmentalHistory(hours: number = 1): Promise<EnvironmentalHistoryPoint[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/environmental/history?hours=${hours}`);
+  if (!response.ok) throw new Error('Failed to fetch environmental history');
+  const json = await response.json();
+  return json.data;
+}
+
+/**
+ * Получает вычисленные environmental тренды
+ */
+export async function getEnvironmentalTrends(): Promise<EnvironmentalTrends> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/environmental/trends`);
+  if (!response.ok) throw new Error('Failed to fetch environmental trends');
+  const json = await response.json();
+  return json.trends;
+}
+
+/**
+ * Устанавливает ручное управление environmental актуаторами
+ */
+export async function setEnvironmentalControl(command: EnvironmentalControlCommand): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/environmental/control`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(command)
+  });
+  if (!response.ok) throw new Error('Failed to set environmental control');
+  return response.json();
+}

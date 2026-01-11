@@ -5,6 +5,7 @@ Simulates relative humidity with equilibrium-seeking behavior
 
 import time
 import random
+import logging
 from typing import Optional
 from sensors.base_sensor import BaseSensor
 
@@ -42,6 +43,7 @@ class HumiditySensor(BaseSensor):
         self.equilibrium_humidity = equilibrium_humidity
         self.base_rate = base_rate
         self.noise_amplitude = noise_amplitude
+        self.logger = logging.getLogger(__name__)
         
         # External influences (hidden factors)
         self.ventilation_factor = 1.0  # Multiplier for rate (simulates airflow)

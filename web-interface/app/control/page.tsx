@@ -9,9 +9,12 @@ import {
   getCurrentState, 
   setManualFanControl,
   getUserActions,
+  getEnvironmentalState,
+  setEnvironmentalControl,
   SystemMode,
   CurrentState,
-  UserAction
+  UserAction,
+  EnvironmentalState
 } from '@/lib/api';
 
 export default function Control() {
@@ -19,6 +22,11 @@ export default function Control() {
   const [state, setState] = useState<CurrentState | null>(null);
   const [actions, setActions] = useState<UserAction[]>([]);
   const [fanPWM, setFanPWM] = useState<{ [key: number]: number }>({});
+  const [envState, setEnvState] = useState<EnvironmentalState | null>(null);
+  const [dehumidifierActive, setDehumidifierActive] = useState(false);
+  const [dehumidifierPower, setDehumidifierPower] = useState(75);
+  const [humidifierActive, setHumidifierActive] = useState(false);
+  const [humidifierPower, setHumidifierPower] = useState(75);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -34,6 +42,14 @@ export default function Control() {
         setMode(modeData);
         setState(stateData);
         setActions(actionsData);
+        
+        // Fetch environmental state
+        const envData = await getEnvironmentalState();
+        setEnvState(envData);
+        setDehumidifierActive(envData.actuators.dehumidifier_active);
+        setDehumidifierPower(envData.actuators.dehumidifier_power);
+        setHumidifierActive(envData.actuators.humidifier_active);
+        setHumidifierPower(envData.actuators.humidifier_power);
         // fanPWM НЕ скидаємо!
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -295,6 +311,121 @@ export default function Control() {
             </div>
           </>
         )}
+
+        {/* Environmental Controls */}
+        <div className="bg-white rounded-lg shadow p-6 mb-6">
+          <h2 className="text-xl font-bold mb-4">🌡️ Керування навколишнім середовищем</h2>
+          
+          {/* Current State Display */}
+          <div className="bg-gray-50 p-4 rounded-lg mb-4">
+            <div className="grid grid-cols-2 gap-4 text-sm">
+              <div>
+                <span className="text-gray-600">Поточна вологість:</span>
+                <span className="font-bold ml-2">{envState?.humidity?.toFixed(1) ?? '--'}%</span>
+              </div>
+              <div>
+                <span className="text-gray-600">Поточний пил:</span>
+                <span className="font-bold ml-2">{envState?.dust?.toFixed(1) ?? '--'} μg/m³</span>
+              </div>
+            </div>
+          </div>
+          
+          {/* Dehumidifier Control */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-lg font-medium">Осушувач повітря</label>
+              <button
+                onClick={() => setDehumidifierActive(!dehumidifierActive)}
+                className={`px-4 py-2 rounded-lg font-medium ${
+                  dehumidifierActive 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {dehumidifierActive ? 'УВІМКНЕНО' : 'ВИМКНЕНО'}
+              </button>
+            </div>
+            
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={dehumidifierPower}
+              onChange={(e) => setDehumidifierPower(parseInt(e.target.value))}
+              disabled={!dehumidifierActive}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            
+            <div className="flex justify-between text-sm text-gray-600 mt-1">
+              <span>0%</span>
+              <span>Потужність: {dehumidifierPower}%</span>
+              <span>100%</span>
+            </div>
+            
+            <div className="text-sm text-gray-600 mt-2 p-2 bg-blue-50 rounded">
+              <strong>Прогноз:</strong> При потужності {dehumidifierPower}% осушувач 
+              знизить вологість на ~{(dehumidifierPower * 0.05).toFixed(1)}% за 1 годину
+            </div>
+          </div>
+          
+          {/* Humidifier Control */}
+          <div className="mb-6">
+            <div className="flex items-center justify-between mb-2">
+              <label className="text-lg font-medium">Зволожувач повітря</label>
+              <button
+                onClick={() => setHumidifierActive(!humidifierActive)}
+                className={`px-4 py-2 rounded-lg font-medium ${
+                  humidifierActive 
+                    ? 'bg-blue-500 text-white' 
+                    : 'bg-gray-200 text-gray-700'
+                }`}
+              >
+                {humidifierActive ? 'УВІМКНЕНО' : 'ВИМКНЕНО'}
+              </button>
+            </div>
+            
+            <input
+              type="range"
+              min="0"
+              max="100"
+              value={humidifierPower}
+              onChange={(e) => setHumidifierPower(parseInt(e.target.value))}
+              disabled={!humidifierActive}
+              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+            />
+            
+            <div className="flex justify-between text-sm text-gray-600 mt-1">
+              <span>0%</span>
+              <span>Потужність: {humidifierPower}%</span>
+              <span>100%</span>
+            </div>
+            
+            <div className="text-sm text-gray-600 mt-2 p-2 bg-blue-50 rounded">
+              <strong>Прогноз:</strong> При потужності {humidifierPower}% зволожувач 
+              підвищить вологість на ~{(humidifierPower * 0.05).toFixed(1)}% за 1 годину
+            </div>
+          </div>
+          
+          {/* Apply Button */}
+          <button
+            onClick={async () => {
+              try {
+                await setEnvironmentalControl({
+                  dehumidifier_active: dehumidifierActive,
+                  dehumidifier_power: dehumidifierPower,
+                  humidifier_active: humidifierActive,
+                  humidifier_power: humidifierPower
+                });
+                alert('✓ Налаштування навколишнього середовища застосовано!');
+              } catch (error) {
+                alert('Помилка: ' + error);
+              }
+            }}
+            className="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 px-6 rounded-lg"
+          >
+            Застосувати налаштування середовища
+          </button>
+        </div>
 
         {/* Історія дій */}
         {actions.length > 0 && (
