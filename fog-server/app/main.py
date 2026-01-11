@@ -129,6 +129,61 @@ class SystemMode(BaseModel):
     changed_by: str  # "user" или "system"
 
 # ============================================================================
+# ENVIRONMENTAL MONITORING MODELS
+# ============================================================================
+
+class EnvironmentalSensorData(BaseModel):
+    """
+    Environmental sensor readings (humidity and dust)
+    """
+    humidity: float = Field(..., ge=0.0, le=100.0, description="Relative humidity (%)")
+    dust: float = Field(..., ge=0.0, le=500.0, description="Dust concentration PM (μg/m³)")
+
+
+class EnvironmentalActuatorData(BaseModel):
+    """
+    Environmental actuator states (dehumidifier, humidifier)
+    """
+    dehumidifier_active: bool = Field(default=False, description="Dehumidifier relay state")
+    dehumidifier_power: int = Field(default=0, ge=0, le=100, description="Dehumidifier power level (%)")
+    humidifier_active: bool = Field(default=False, description="Humidifier relay state")
+    humidifier_power: int = Field(default=0, ge=0, le=100, description="Humidifier power level (%)")
+
+
+class EnvironmentalPayload(BaseModel):
+    """
+    Complete environmental telemetry payload
+    Sent alongside standard telemetry or separately
+    """
+    device_id: str = Field(..., description="Device ID")
+    timestamp: str = Field(..., description="ISO 8601 timestamp")
+    sensors: EnvironmentalSensorData = Field(..., description="Environmental sensor data")
+    actuators: EnvironmentalActuatorData = Field(..., description="Environmental actuator states")
+
+
+class EnvironmentalControlCommand(BaseModel):
+    """
+    Environmental control command from fog server
+    Controls dehumidifier and humidifier relays
+    """
+    dehumidifier_active: bool = Field(default=False, description="Activate dehumidifier")
+    dehumidifier_power: int = Field(default=0, ge=0, le=100, description="Dehumidifier power (%)")
+    humidifier_active: bool = Field(default=False, description="Activatehumidifier")
+    humidifier_power: int = Field(default=0, ge=0, le=100, description="Humidifier power (%)")
+
+
+class EnvironmentalAlertEvent(BaseModel):
+    """
+    Environmental alert event
+    """
+    alert_type: str  # "dust_high", "humidity_low", "humidity_high"
+    current_value: float
+    threshold: float
+    severity: str  # "warning" или "critical"
+    timestamp: str
+    message: str
+
+# ============================================================================
 # INFLUXDB КЛИЕНТ
 # ============================================================================
 
@@ -267,6 +322,76 @@ class InfluxDBManager:
                     "time": record.values.get("_time").isoformat(),
                     "measurement": record.values.get("_measurement"),
                     "gpu_id": record.values.get("gpu_id"),
+                    "value": record.values.get("_value")
+                })
+        
+        return data
+    
+    def write_environmental_telemetry(self, payload: EnvironmentalPayload):
+        """
+        Сохранение environmental telemetry в InfluxDB
+        
+        Structure:
+        - measurement: environmental_sensors (humidity, dust)
+        - measurement: environmental_actuators (dehumidifier, humidifier states)
+        """
+        points = []
+        
+        # Environmental sensors
+        point = Point("environmental_sensors") \
+            .tag("device_id", payload.device_id) \
+            .field("humidity", payload.sensors.humidity) \
+            .field("dust", payload.sensors.dust) \
+            .time(payload.timestamp)
+        points.append(point)
+        
+        # Environmental actuators
+        point = Point("environmental_actuators") \
+            .tag("device_id", payload.device_id) \
+            .field("dehumidifier_active", int(payload.actuators.dehumidifier_active)) \
+            .field("dehumidifier_power", payload.actuators.dehumidifier_power) \
+            .field("humidifier_active", int(payload.actuators.humidifier_active)) \
+            .field("humidifier_power", payload.actuators.humidifier_power) \
+            .time(payload.timestamp)
+        points.append(point)
+        
+        # Записываем все точки одним батчем
+        self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=points)
+    
+    def write_environmental_alert(self, alert: Dict):
+        """Сохранение environmental alert"""
+        point = Point("environmental_alerts") \
+            .tag("alert_type", alert['alert_type']) \
+            .tag("severity", alert['severity']) \
+            .field("current_value", alert['current_value']) \
+            .field("threshold", alert['threshold']) \
+            .field("message", alert['message']) \
+            .time(alert['timestamp'])
+        
+        self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=point)
+    
+    def query_environmental_history(self, hours: int = 1) -> List[Dict[str, Any]]:
+        """
+        Получает environmental history за последние N часов
+        
+        Returns:
+            Список точек данных для графиков
+        """
+        query = f'''
+        from(bucket: "{config.INFLUXDB_BUCKET}")
+          |> range(start: -{hours}h)
+          |> filter(fn: (r) => r["_measurement"] == "environmental_sensors")
+          |> filter(fn: (r) => r["_field"] == "humidity" or r["_field"] == "dust")
+        '''
+        
+        result = self.query_api.query(query=query)
+        
+        data = []
+        for table in result:
+            for record in table.records:
+                data.append({
+                    "time": record.values.get("_time").isoformat(),
+                    "field": record.values.get("_field"),
                     "value": record.values.get("_value")
                 })
         
@@ -430,6 +555,12 @@ class SmartCoolingAlgorithm:
         )
 
 cooling_algo = SmartCoolingAlgorithm()
+
+# ============================================================================
+# ENVIRONMENTAL CONTROL ALGORITHM
+# ============================================================================
+
+from environmental_control import environmental_control_algo, trend_analyzer
 
 # ============================================================================
 # СИСТЕМА АЛЕРТОВ

@@ -16,6 +16,12 @@ from edge_gateway.esp32_gateway import ESP32Gateway
 from core.workload_profiles import WorkloadOrchestrator
 from logger_config import setup_logger
 
+# Environmental components
+from environmental_profiles import ProfileManager, PROFILES
+from sensors.humidity_sensor import HumiditySensor
+from sensors.dust_sensor import DustSensor
+from actuators.environmental_controller import EnvironmentalController
+
 logger = setup_logger(__name__, level=logging.INFO)
 
 
@@ -33,6 +39,15 @@ class ESP32Emulator:
         
         # Загружаем конфигурацию
         self.config = self._load_config(config_path)
+        
+        # Environmental profile manager
+        profile_id = self.config.get('environmental', {}).get('profile_id', 5)
+        logger.info(f"Инициализация environmental profile: {profile_id}")
+        self.profile_manager = ProfileManager(default_profile_id=profile_id)
+        current_profile = self.profile_manager.current_profile
+        logger.info(f"  ✓ Profile: {current_profile.name}")
+        logger.info(f"    Humidity: {current_profile.humidity_initial}% → {current_profile.humidity_equilibrium}%")
+        logger.info(f"    Dust: {current_profile.dust_initial} → {current_profile.dust_equilibrium} μg/m³")
         
         # Инициализируем компоненты
         self.device_id = self.config['device']['id']
@@ -68,6 +83,29 @@ class ESP32Emulator:
         logger.info(f"Инициализация ESP32 Edge Gateway...")
         logger.info(f"  Fog-сервер: {fog_url}")
         self.gateway = ESP32Gateway(self.device_id, fog_url, logger)
+        
+        # Environmental sensors
+        logger.info("Инициализация environmental sensors...")
+        self.humidity_sensor = HumiditySensor(
+            sensor_id="DHT22_001",
+            initial_humidity=current_profile.humidity_initial,
+            equilibrium_humidity=current_profile.humidity_equilibrium,
+            base_rate=current_profile.humidity_rate
+        )
+        logger.info(f"  ✓ Humidity sensor: {self.humidity_sensor.current_humidity:.1f}%")
+        
+        self.dust_sensor = DustSensor(
+            sensor_id="GP2Y1010_001",
+            initial_dust=current_profile.dust_initial,
+            equilibrium_dust=current_profile.dust_equilibrium,
+            base_rate=current_profile.dust_rate
+        )
+        logger.info(f"  ✓ Dust sensor: {self.dust_sensor.current_dust:.1f} μg/m³")
+        
+        # Environmental controller
+        logger.info("Инициализация environmental controller...")
+        self.environmental_controller = EnvironmentalController(logger)
+        logger.info("  ✓ Environmental actuators ready")
         
         # Параметры таймингов
         self.sensor_read_interval = self.config['timing']['sensor_read_interval']
@@ -129,6 +167,23 @@ class ESP32Emulator:
                 room_temp=self.room.temperature
             )
         
+        # 5. Evolve environmental parameters
+        # Calculate average fan PWM for dust influence
+        avg_fan_pwm = sum(self.fan_controller.fans[i+1]['pwm'] for i in range(self.gpu_count)) / self.gpu_count
+        
+        # Apply environmental controller commands to sensors
+        actuator_state = self.environmental_controller.get_state()
+        self.humidity_sensor.apply_control(
+            actuator_state['dehumidifier_active'],
+            actuator_state['dehumidifier_power'],
+            actuator_state['humidifier_active'],
+            actuator_state['humidifier_power']
+        )
+        
+        # Evolve sensors
+        self.humidity_sensor.evolve(delta_time=self.sensor_read_interval)
+        self.dust_sensor.evolve(delta_time=self.sensor_read_interval, avg_fan_pwm=avg_fan_pwm)
+        
         self.total_readings += 1
         
         # Логируем каждое 6-е чтение 
@@ -149,6 +204,22 @@ class ESP32Emulator:
                 f"[Нагрузка: {gpu.workload*100:3.0f}%] | "
                 f"Вентилятор: {fan_state['rpm']:4d} RPM (PWM: {fan_state['pwm']:3d}%)"
             )
+        
+        # Environmental parameters
+        logger.info(f"🌡️ Environmental:")
+        logger.info(
+            f"  Humidity: {self.humidity_sensor.current_humidity:.1f}% "
+            f"(target: {self.humidity_sensor.equilibrium_humidity:.1f}%)"  
+        )
+        logger.info(
+            f"  Dust: {self.dust_sensor.current_dust:.1f} μg/m³ "
+            f"(status: {self.dust_sensor.get_status_level()})"  
+        )
+        actuator_state = self.environmental_controller.get_state()
+        if actuator_state['dehumidifier_active']:
+            logger.info(f"  Dehumidifier: ON ({actuator_state['dehumidifier_power']}%)")
+        if actuator_state['humidifier_active']:
+            logger.info(f"  Humidifier: ON ({actuator_state['humidifier_power']}%)")
     
     def _create_telemetry_payload(self) -> TelemetryPayload:
         """
@@ -186,6 +257,32 @@ class ESP32Emulator:
         
         return payload
     
+    def _create_environmental_payload(self):
+        """
+        Создаёт пакет environmental telemetry
+        
+        Returns:
+            EnvironmentalPayload готовый к отправке
+        """
+        # Read sensors
+        humidity = self.humidity_sensor.read()
+        dust = self.dust_sensor.read()
+        
+        # Get actuator state
+        actuator_state = self.environmental_controller.get_state()
+        
+        # Create payload
+        payload = self.gateway.collect_environmental_telemetry(
+            humidity=humidity,
+            dust=dust,
+            dehumidifier_active=actuator_state['dehumidifier_active'],
+            dehumidifier_power=actuator_state['dehumidifier_power'],
+            humidifier_active=actuator_state['humidifier_active'],
+            humidifier_power=actuator_state['humidifier_power']
+        )
+        
+        return payload
+    
     def _send_data(self):
         """
         Отправляет накопленные данные на fog-сервер через ESP32 Gateway
@@ -203,6 +300,15 @@ class ESP32Emulator:
             commands = self.gateway.receive_commands()
             if commands:
                 self._apply_fan_commands(commands)
+            
+            # Environmental telemetry
+            env_payload = self._create_environmental_payload()
+            env_success = self.gateway.send_environmental_telemetry(env_payload)
+            
+            # Receive environmental commands
+            env_commands = self.gateway.receive_environmental_commands()
+            if env_commands:
+                self._apply_environmental_commands(env_commands)
         else:
             self.failed_sends += 1
             logger.warning(f"⚠ Всего неудачных отправок: {self.failed_sends}")
@@ -226,6 +332,21 @@ class ESP32Emulator:
                 f"PWM {old_pwm}% → {cmd.pwm_duty}% "
                 f"({new_rpm} RPM)"
             )
+    
+    def _apply_environmental_commands(self, commands: dict):
+        """
+        Применяет команды управления environmental actuators от fog-сервера
+        
+        Args:
+            commands: Dict с командами
+        """
+        logger.info(f"🌡️ Применение environmental commands...")
+        
+        # Apply commands to controller
+        self.environmental_controller.apply_command(commands)
+        
+        # Log status
+        logger.info(f"✓ Environmental actuators обновлены")
     
     def run(self):
         """

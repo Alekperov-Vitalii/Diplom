@@ -69,3 +69,17 @@ sensors:
     type: "DS18B20"
     noise_std: 0.3 # Стандартное отклонение шума (°C)
     resolution: 0.1 # Разрешение датчика (°C)
+
+# Environmental Monitoring Configuration
+environmental:
+  profile_id: 5 # Default profile (1-9): Moderate Dust, Optimal Humidity
+  # Profiles:
+  # 1: Low Dust, Low Humidity
+  # 2: Low Dust, Optimal Humidity
+  # 3: Low Dust, High Humidity
+  # 4: Moderate Dust, Low Humidity
+  # 5: Moderate Dust, Optimal Humidity
+  # 6: Moderate Dust, High Humidity
+  # 7: High Dust, Low Humidity
+  # 8: High Dust, Optimal Humidity
+  # 9: High Dust, High Humidity
