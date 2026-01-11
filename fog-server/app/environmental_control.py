@@ -56,10 +56,16 @@ class EnvironmentalControlAlgorithm:
         
         print("✓ Environmental Control Algorithm initialized")
         
-    def update_current_state(self, humidity: float, dust: float):
+    def update_current_state(self, humidity: float, dust: float, actuators: Optional[Dict] = None):
         """Update current environmental state"""
         self.current_humidity = humidity
         self.current_dust = dust
+        
+        if actuators:
+            self.dehumidifier_active = actuators.get('dehumidifier_active', False)
+            self.dehumidifier_power = actuators.get('dehumidifier_power', 0)
+            self.humidifier_active = actuators.get('humidifier_active', False)
+            self.humidifier_power = actuators.get('humidifier_power', 0)
 
     
     def calculate_control_commands(

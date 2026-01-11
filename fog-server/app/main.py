@@ -1053,7 +1053,8 @@ async def receive_environmental_telemetry(payload: EnvironmentalPayload):
         # Update current state in algo for cooling calculations
         environmental_control_algo.update_current_state(
             payload.sensors.humidity,
-            payload.sensors.dust
+            payload.sensors.dust,
+            payload.actuators.dict()
         )
         
         # 3. Проверяем alerts

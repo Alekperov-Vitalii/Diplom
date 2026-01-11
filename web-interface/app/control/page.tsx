@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import Link from 'next/link';
 import { ArrowLeft, AlertTriangle, Save, RotateCcw } from 'lucide-react';
 import { 
@@ -27,8 +27,10 @@ export default function Control() {
   const [dehumidifierPower, setDehumidifierPower] = useState(75);
   const [humidifierActive, setHumidifierActive] = useState(false);
   const [humidifierPower, setHumidifierPower] = useState(75);
+
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const envInitialized = useRef(false);
 
   useEffect(() => {
     const fetchData = async () => {
@@ -46,10 +48,13 @@ export default function Control() {
         // Fetch environmental state
         const envData = await getEnvironmentalState();
         setEnvState(envData);
-        setDehumidifierActive(envData.actuators.dehumidifier_active);
-        setDehumidifierPower(envData.actuators.dehumidifier_power);
-        setHumidifierActive(envData.actuators.humidifier_active);
-        setHumidifierPower(envData.actuators.humidifier_power);
+        if (!envInitialized.current) {
+          setDehumidifierActive(envData.actuators.dehumidifier_active);
+          setDehumidifierPower(envData.actuators.dehumidifier_power);
+          setHumidifierActive(envData.actuators.humidifier_active);
+          setHumidifierPower(envData.actuators.humidifier_power);
+          envInitialized.current = true;
+        }
         // fanPWM НЕ скидаємо!
       } catch (error) {
         console.error('Error fetching data:', error);
@@ -192,6 +197,7 @@ export default function Control() {
             <div className="bg-blue-50 border-l-4 border-blue-500 p-4 rounded">
               <p className="text-sm text-blue-700">
                 ✓ Система працює в автоматичному режимі. Каскадний алгоритм керує вентиляторами на основі температури GPU та приміщення.
+                Керування вологістю та пилом також відбувається автоматично. Для ручного втручання перейдіть у режим &quot;Ручний&quot;.
               </p>
             </div>
           )}
@@ -313,7 +319,8 @@ export default function Control() {
         )}
 
         {/* Environmental Controls */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
+        {mode?.mode === 'manual' && (
+          <div className="bg-white rounded-lg shadow p-6 mb-6">
           <h2 className="text-xl font-bold mb-4">🌡️ Керування навколишнім середовищем</h2>
           
           {/* Current State Display */}
@@ -426,6 +433,7 @@ export default function Control() {
             Застосувати налаштування середовища
           </button>
         </div>
+        )}
 
         {/* Історія дій */}
         {actions.length > 0 && (
