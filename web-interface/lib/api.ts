@@ -9,6 +9,7 @@ export interface GPUTemp {
   temperature: number;
   load: number;
 }
+export type GpuTemperature = GPUTemp;
 
 export interface Alert {
   gpu_id: number;
@@ -16,6 +17,7 @@ export interface Alert {
   threshold: number;
   severity: 'warning' | 'critical';
   timestamp: string;
+  message?: string;
 }
 
 export interface CurrentState {
