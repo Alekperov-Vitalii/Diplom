@@ -1,19 +1,25 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { getEnvironmentalTrends, EnvironmentalTrends } from '@/lib/api';
-import { TrendingUp, Wind, Gauge, ArrowLeft } from 'lucide-react';
+import { getEnvironmentalTrends, EnvironmentalTrends, getAdvancedTrends, AdvancedTrends } from '@/lib/api';
+import { TrendingUp, Wind, Gauge, ArrowLeft, Droplets, Fan, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function TrendsPage() {
   const [trends, setTrends] = useState<EnvironmentalTrends | null>(null);
+  const [advTrends, setAdvTrends] = useState<AdvancedTrends | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const fetchTrends = async () => {
       try {
-        const data = await getEnvironmentalTrends();
-        setTrends(data);
+
+        const [trendsData, advData] = await Promise.all([
+          getEnvironmentalTrends(),
+          getAdvancedTrends()
+        ]);
+        setTrends(trendsData);
+        setAdvTrends(advData);
       } catch (error) {
         console.error('Error fetching trends:', error);
       } finally {
@@ -130,6 +136,87 @@ export default function TrendsPage() {
             </p>
           </div>
         </div>
+
+
+        {/* --- ADVANCED TRENDS (CUMULATIVE) --- */}
+        <h2 className="text-3xl font-bold mb-6 mt-12 border-b pb-2">Довгострокові показники зносу</h2>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+            {/* Corrosion Index Card */}
+            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-cyan-500">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                        <Droplets className="w-6 h-6 mr-2 text-cyan-600" />
+                        <h2 className="text-xl font-bold">Індекс Корозії (CI)</h2>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        advTrends?.corrosion_index.risk_level === 'high' ? 'bg-red-100 text-red-700' :
+                        advTrends?.corrosion_index.risk_level === 'medium' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-green-100 text-green-700'
+                    }`}>
+                        {advTrends?.corrosion_index.risk_level.toUpperCase()}
+                    </span>
+                </div>
+                
+                <div className="mb-4">
+                    <div className="text-5xl font-bold text-cyan-700">
+                        {advTrends?.corrosion_index.value.toFixed(3)}
+                    </div>
+                </div>
+
+                <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                        <span>Low Threshold:</span>
+                        <span className="font-mono">{advTrends?.corrosion_index.threshold_low}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>High Threshold:</span>
+                        <span className="font-mono">{advTrends?.corrosion_index.threshold_high}</span>
+                    </div>
+                    <p className="mt-2 text-gray-500 italic">
+                        Накопичувальний індекс, що залежить від вологості та часу. Впливає на ефективність охолодження (-{((advTrends?.modifiers.cooling_efficiency || 1) < 1 ? (1 - (advTrends?.modifiers.cooling_efficiency || 1))*100 : 0).toFixed(1)}%).
+                    </p>
+                </div>
+            </div>
+
+            {/* Fan Wear Index Card */}
+            <div className="bg-white rounded-lg shadow p-6 border-l-4 border-gray-500">
+                <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center">
+                        <Fan className="w-6 h-6 mr-2 text-gray-600" />
+                        <h2 className="text-xl font-bold">Індекс Зносу Вентиляторів (FWI)</h2>
+                    </div>
+                    <span className={`px-3 py-1 rounded-full text-sm font-bold ${
+                        advTrends?.fan_wear_index.wear_level === 'critical' ? 'bg-red-100 text-red-700' :
+                        advTrends?.fan_wear_index.wear_level === 'elevated' ? 'bg-yellow-100 text-yellow-700' :
+                        'bg-blue-100 text-blue-700'
+                    }`}>
+                        {advTrends?.fan_wear_index.wear_level.toUpperCase()}
+                    </span>
+                </div>
+                
+                <div className="mb-4">
+                    <div className="text-5xl font-bold text-gray-700">
+                        {advTrends?.fan_wear_index.value.toFixed(1)}
+                    </div>
+                </div>
+
+                <div className="space-y-2 text-sm text-gray-600">
+                    <div className="flex justify-between">
+                        <span>Elevated Threshold:</span>
+                        <span className="font-mono">{advTrends?.fan_wear_index.threshold_elevated}</span>
+                    </div>
+                    <div className="flex justify-between">
+                        <span>Critical Threshold:</span>
+                        <span className="font-mono">{advTrends?.fan_wear_index.threshold_critical}</span>
+                    </div>
+                    <p className="mt-2 text-gray-500 italic">
+                        Залежить від обертів (RPM), пилу та часу. Збільшує енергоспоживання (+{((advTrends?.modifiers.fan_power || 1) > 1 ? ((advTrends?.modifiers.fan_power || 1) - 1)*100 : 0).toFixed(1)}%).
+                    </p>
+                </div>
+            </div>
+        </div>
+
       </div>
     </div>
   );

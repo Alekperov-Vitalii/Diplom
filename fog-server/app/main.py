@@ -268,6 +268,64 @@ class InfluxDBManager:
         
         self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=point)
     
+    def write_advanced_trends(self, device_id: str, ci: float, ci_risk: str, fwi: float, fwi_wear: str):
+        """
+        Сохранение продвинутых трендов (CI, FWI)
+        """
+        point = Point("advanced_trends") \
+            .tag("device_id", device_id) \
+            .field("corrosion_index", ci) \
+            .tag("ci_risk", ci_risk) \
+            .field("fan_wear_index", fwi) \
+            .tag("fwi_wear", fwi_wear) \
+            .time(datetime.now(timezone.utc))
+        
+        self.write_api.write(bucket=config.INFLUXDB_BUCKET, record=point)
+
+    def query_advanced_trends_history(self, hours: int = 24) -> List[Dict]:
+        """
+        Запрос истории продвинутых трендов
+        """
+        query = f'''
+        from(bucket: "{config.INFLUXDB_BUCKET}")
+          |> range(start: -{hours}h)
+          |> filter(fn: (r) => r["_measurement"] == "advanced_trends")
+          |> pivot(rowKey:["_time"], columnKey:["_field"], valueColumn:"_value")
+          |> sort(columns: ["_time"])
+        '''
+        
+        try:
+            result = self.query_api.query(query=query)
+            history = []
+            
+            for table in result:
+                for record in table.records:
+                    # Debug logging
+                    # print(f"DEBUG: Record: {record.values}")
+                    
+                    ts = record.get_time()
+                    if ts is None:
+                        ts = record.values.get("_time")
+                    
+                    ts_str = ""
+                    if hasattr(ts, 'isoformat'):
+                        ts_str = ts.isoformat()
+                    else:
+                        ts_str = str(ts)
+
+                    history.append({
+                        "time": ts_str,
+                        "ci": record.values.get("corrosion_index"),
+                        "fwi": record.values.get("fan_wear_index"),
+                        "ci_risk": record.values.get("ci_risk"),
+                        "fwi_wear": record.values.get("fwi_wear")
+                    })
+            
+            return history
+        except Exception as e:
+            print(f"Error querying advanced trends: {e}")
+            return []
+    
     def query_latest_state(self) -> Dict[int, Dict[str, float]]:
         """
         Получает последние метрики всех GPU (temp, load)
@@ -581,6 +639,14 @@ class SmartCoolingAlgorithm:
 
 cooling_algo = SmartCoolingAlgorithm()
 
+
+# ============================================================================
+# ADVANCED TRENDS CALCULATOR
+# ============================================================================
+
+from trend_calculator import AdvancedTrendCalculator
+advanced_trend_calc = None  # Will be initialized in lifespan
+
 # ============================================================================
 # ENVIRONMENTAL CONTROL ALGORITHM
 # ============================================================================
@@ -662,6 +728,12 @@ async def lifespan(app: FastAPI):
     print("🚀 Запуск Fog-сервера")
     print("=" * 60)
     influx_manager.connect()
+    influx_manager.connect()
+    
+    # Initialize Advanced Trend Calculator
+    global advanced_trend_calc
+    advanced_trend_calc = AdvancedTrendCalculator(influx_manager)
+    
     print("✓ Сервер готов к приёму данных")
     print("=" * 60)
     
@@ -738,6 +810,26 @@ async def receive_telemetry(payload: TelemetryPayload):
                 pending_commands[payload.device_id] = fan_commands
         
         print(f"✓ Телеметрия получена от {payload.device_id} (режим: {system_mode['mode']})")
+
+        # 4. Обновляем продвинутые тренды (CI, FWI)
+        # Рассчитываем средние значения
+        avg_rpm = sum(f.rpm for f in payload.fans.fan_states) / len(payload.fans.fan_states) if payload.fans.fan_states else 0
+        avg_gpu_temp = sum(t.temperature for t in payload.sensors.gpu_temps) / len(payload.sensors.gpu_temps) if payload.sensors.gpu_temps else 0
+        
+        # Получаем актуальные данные среды
+        current_humidity = environmental_control_algo.current_humidity
+        current_dust = environmental_control_algo.current_dust
+        
+        if advanced_trend_calc:
+            advanced_trend_calc.update_all(
+                humidity=current_humidity,
+                dust=current_dust,
+                room_temp=payload.sensors.room_temp,
+                avg_rpm=avg_rpm,
+                avg_gpu_temp=avg_gpu_temp
+            )
+            # Сохраняем в InfluxDB (можно оптимизировать и писать реже)
+            advanced_trend_calc.store_to_influx(device_id=payload.device_id)
         
         return {
             "status": "success",
@@ -1025,6 +1117,53 @@ async def get_fan_statistics():
 # Storage for pending environmental commands
 pending_environmental_commands: Dict[str, Dict] = {}
 
+
+# ============================================================================
+# ADVANCED TRENDS API
+# ============================================================================
+
+@app.get("/api/v1/trends/advanced")
+async def get_advanced_trends():
+    """
+    Получить текущие значения продвинутых трендов (CI, FWI)
+    """
+    if advanced_trend_calc:
+        return {
+            "corrosion_index": {
+                "value": advanced_trend_calc.ci,
+                "risk_level": advanced_trend_calc._get_ci_risk_level(),
+                "threshold_low": advanced_trend_calc.CI_LOW_THRESHOLD,
+                "threshold_high": advanced_trend_calc.CI_HIGH_THRESHOLD
+            },
+            "fan_wear_index": {
+                "value": advanced_trend_calc.fwi,
+                "wear_level": advanced_trend_calc._get_fwi_wear_level(),
+                "threshold_elevated": advanced_trend_calc.FWI_ELEVATED_THRESHOLD,
+                "threshold_critical": advanced_trend_calc.FWI_CRITICAL_THRESHOLD
+            },
+            "modifiers": {
+                "cooling_efficiency": advanced_trend_calc.get_cooling_efficiency_modifier(),
+                "fan_power": advanced_trend_calc.get_fan_power_modifier()
+            }
+        }
+    return {}
+
+@app.get("/api/v1/trends/advanced/history")
+async def get_advanced_trends_history(hours: int = 24):
+    """
+    Получить историю трендов CI и FWI
+    """
+    return {"data": influx_manager.query_advanced_trends_history(hours=hours)}
+
+@app.post("/api/v1/trends/advanced/reset")
+async def reset_advanced_trends():
+    """
+    Сбросить тренды в 0 (вручную или при смене профиля)
+    """
+    if advanced_trend_calc:
+        advanced_trend_calc.reset_indices()
+    return {"status": "success", "message": "Trends reset to zero"}
+
 @app.post("/api/v1/environmental/telemetry")
 async def receive_environmental_telemetry(payload: EnvironmentalPayload):
     """
@@ -1264,6 +1403,39 @@ async def get_user_actions(limit: int = 20):
         "total": len(user_action_log)
     }
 
+
+
+# ============================================================================
+# ADMIN & SYSTEM ENDPOINTS
+# ============================================================================
+
+# Global state for target profile
+target_profile_id: int = 5  # Default profile
+
+class ProfileUpdate(BaseModel):
+    profile_id: int = Field(..., ge=1, le=9)
+
+@app.post("/api/v1/admin/profile")
+async def set_profile(update: ProfileUpdate):
+    """
+    Set target environmental profile
+    """
+    global target_profile_id
+    target_profile_id = update.profile_id
+    
+    # Also reset trends as profile change invalidates cumulative history
+    if advanced_trend_calc:
+        advanced_trend_calc.reset_indices()
+    
+    print(f"👑 Admin: Profile changed to {target_profile_id}")
+    return {"status": "success", "profile_id": target_profile_id}
+
+@app.get("/api/v1/system/profile")
+async def get_system_profile():
+    """
+    Get current target profile (for Emulator sync)
+    """
+    return {"profile_id": target_profile_id}
 
 # ============================================================================
 # ЗАПУСК СЕРВЕРА

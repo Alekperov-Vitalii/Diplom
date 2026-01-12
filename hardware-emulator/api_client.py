@@ -206,3 +206,25 @@ class FogServerClient:
         except Exception as e:
             logger.warning(f"Ошибка получения environmental commands: {e}")
             return None
+
+    def fetch_system_profile(self) -> Optional[int]:
+        """
+        Получает текущий системный профиль (target profile) от fog-сервера
+        
+        Returns:
+            ID профиля (int) или None если ошибка
+        """
+        endpoint = f"{self.base_url}/api/v1/system/profile"
+        
+        try:
+            response = self.session.get(endpoint, timeout=self.timeout)
+            response.raise_for_status()
+            
+            data = response.json()
+            # Expecting {"profile_id": 5}
+            return data.get("profile_id")
+            
+        except Exception as e:
+            # Не логируем ошибку как warning постоянно, так как это polling
+            # logger.debug(f"Ошибка проверки профиля: {e}")
+            return None

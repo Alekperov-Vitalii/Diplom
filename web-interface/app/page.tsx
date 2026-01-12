@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 import { getCurrentState, CurrentState, healthCheck, getFanStatistics, FanStatistics, getSystemMode, SystemMode, getEnvironmentalState, EnvironmentalState } from '@/lib/api';
 import Link from 'next/link';
-import { Thermometer, Fan, AlertTriangle, Activity, Settings, Droplets, History, TrendingUp, Sliders } from 'lucide-react';
+import { Thermometer, Fan, AlertTriangle, Activity, Settings, Droplets, History, TrendingUp, Sliders, Shield } from 'lucide-react';
 import FanCard from '@/components/FanCard';
 
 export default function Dashboard() {
@@ -110,7 +110,7 @@ export default function Dashboard() {
         </div>
 
         {/* Navigation Buttons */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
           <Link href="/history" className="flex items-center justify-center p-4 bg-white rounded-lg shadow border-2 border-transparent hover:border-blue-500 hover:shadow-md transition-all group">
             <div className="bg-blue-100 p-3 rounded-full mr-4 group-hover:bg-blue-200 transition-colors">
               <History className="w-6 h-6 text-blue-600" />
@@ -137,7 +137,17 @@ export default function Dashboard() {
             </div>
             <div className="text-left">
               <div className="font-bold text-lg text-gray-900">Керування</div>
-              <div className="text-sm text-gray-500">Вентилятори та середовище</div>
+              <div className="text-sm text-gray-500">Вентилятори та умови</div>
+            </div>
+          </Link>
+
+          <Link href="/admin" className="flex items-center justify-center p-4 bg-white rounded-lg shadow border-2 border-transparent hover:border-orange-500 hover:shadow-md transition-all group">
+            <div className="bg-orange-100 p-3 rounded-full mr-4 group-hover:bg-orange-200 transition-colors">
+              <Shield className="w-6 h-6 text-orange-600" />
+            </div>
+            <div className="text-left">
+              <div className="font-bold text-lg text-gray-900">Admin</div>
+              <div className="text-sm text-gray-500">Профілі та налаштування</div>
             </div>
           </Link>
         </div>

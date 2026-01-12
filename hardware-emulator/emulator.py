@@ -141,7 +141,14 @@ class ESP32Emulator:
         Читает все датчики и обновляет физику
         Вызывается каждые 5 секунд
         """
+        # Periodic check for remote profile update (every 10 readings ~ 50s)
+        if self.total_readings > 0 and self.total_readings % 10 == 0:
+            self._check_remote_profile()
+
         # 1. Обновляем нагрузку через WorkloadOrchestrator
+        if self.total_readings > 0 and self.total_readings % 6 == 0: # Every 30s
+            self._check_remote_profile()
+
         if self.workload_orchestrator.should_update_workload():
             for i, gpu in enumerate(self.gpus):
                 gpu_id = i + 1
@@ -398,6 +405,50 @@ class ESP32Emulator:
         if self.total_sends > 0:
             success_rate = (self.total_sends / (self.total_sends + self.failed_sends)) * 100
             logger.info(f"   Процент успеха: {success_rate:.1f}%")
+
+
+
+    def _check_remote_profile(self):
+        """Checks if server requests a profile change"""
+        try:
+            # Use gateway's client directly to fetch target profile
+            target_profile_id = self.gateway.api_client.fetch_system_profile()
+            
+            if target_profile_id and target_profile_id != self.profile_manager.current_profile.profile_id:
+                logger.info(f"🔄 Remote profile change requested: {self.profile_manager.current_profile.profile_id} -> {target_profile_id}")
+                self._switch_profile(target_profile_id)
+        except Exception as e:
+            logger.warning(f"Error checking remote profile: {e}")
+
+    def _switch_profile(self, profile_id: int):
+        """Switches to a new environmental profile and resets sensors"""
+        try:
+            self.profile_manager.switch_profile(profile_id)
+            profile = self.profile_manager.current_profile
+            
+            # Reset sensors to new profile values
+            # Assuming sensor classes have reset_to_initial method
+            if hasattr(self.humidity_sensor, 'reset_to_initial'):
+                self.humidity_sensor.reset_to_initial(
+                    profile.humidity_initial, 
+                    profile.humidity_equilibrium
+                )
+                self.humidity_sensor.base_rate = profile.humidity_rate
+            
+            if hasattr(self.dust_sensor, 'reset_to_initial'):
+                self.dust_sensor.reset_to_initial(
+                    profile.dust_initial, 
+                    profile.dust_equilibrium
+                )
+                self.dust_sensor.base_rate = profile.dust_rate
+            
+            # Reset actuators
+            if hasattr(self.environmental_controller, 'reset'):
+                self.environmental_controller.reset()
+                
+            logger.info(f"✅ Profile switched to {profile.name} (ID: {profile.profile_id})")
+        except Exception as e:
+            logger.error(f"Failed to switch profile: {e}")
 
 
 def main():

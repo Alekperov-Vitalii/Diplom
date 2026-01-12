@@ -237,6 +237,34 @@ export interface EnvironmentalTrends {
   };
 }
 
+
+export interface AdvancedTrends {
+  corrosion_index: {
+    value: number;
+    risk_level: 'low' | 'medium' | 'high';
+    threshold_low: number;
+    threshold_high: number;
+  };
+  fan_wear_index: {
+    value: number;
+    wear_level: 'normal' | 'elevated' | 'critical';
+    threshold_elevated: number;
+    threshold_critical: number;
+  };
+  modifiers: {
+    cooling_efficiency: number;
+    fan_power: number;
+  };
+}
+
+export interface AdvancedTrendHistoryPoint {
+  time: string;
+  ci: number;
+  ci_risk: string;
+  fwi: number;
+  fwi_wear: string;
+}
+
 export interface EnvironmentalControlCommand {
   dehumidifier_active: boolean;
   dehumidifier_power: number;
@@ -284,4 +312,56 @@ export async function setEnvironmentalControl(command: EnvironmentalControlComma
   });
   if (!response.ok) throw new Error('Failed to set environmental control');
   return response.json();
+}
+
+/**
+ * Получает продвинутые тренды (CI, FWI)
+ */
+export async function getAdvancedTrends(): Promise<AdvancedTrends> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/trends/advanced`);
+  if (!response.ok) throw new Error('Failed to fetch advanced trends');
+  return response.json();
+}
+
+/**
+ * Получает историю продвинутых трендов
+ */
+export async function getAdvancedTrendsHistory(hours: number = 24): Promise<AdvancedTrendHistoryPoint[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/trends/advanced/history?hours=${hours}`);
+  if (!response.ok) throw new Error('Failed to fetch advanced trends history');
+  const json = await response.json();
+  return json.data;
+}
+
+/**
+ * Сбрасывает продвинутые тренды в 0
+ */
+export async function resetAdvancedTrends(): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/trends/advanced/reset`, {
+    method: 'POST'
+  });
+  if (!response.ok) throw new Error('Failed to reset trends');
+  return response.json();
+}
+
+/**
+ * Устанавливает системный профиль оточення (admin)
+ */
+export async function setSystemProfile(profileId: number): Promise<unknown> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/admin/profile`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ profile_id: profileId })
+  });
+  if (!response.ok) throw new Error('Failed to set profile');
+  return response.json();
+}
+
+/**
+ * Получает текущий target profile
+ */
+export async function getSystemProfile(): Promise<{profile_id: number}> {
+    const response = await fetch(`${API_BASE_URL}/api/v1/system/profile`);
+    if (!response.ok) throw new Error('Failed to get profile');
+    return response.json();
 }
